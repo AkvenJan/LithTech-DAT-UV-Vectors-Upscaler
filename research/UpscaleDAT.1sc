@@ -8,6 +8,7 @@
 
 const int MaxChar = 1024;
 
+// You need to select the right template for right version of DAT format for your game
 const char Template[MaxChar] = "bspv66.bt"; 
 
 double ScaleFactor = 2.0;
