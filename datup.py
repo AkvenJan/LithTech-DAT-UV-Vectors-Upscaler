@@ -7,23 +7,34 @@ from enum import Enum
 
 # Setting all the available arguments
 parser = argparse.ArgumentParser()
-parser.add_argument("-i", "--input", help="Path and file name of the input DTX to read meta from")
+parser.add_argument("-i", "--input", help="Path and file name of the DAT to read from")
 args = parser.parse_args()
 
+# Values for DEBUG part
+currentByte = 0;
+currentOffset = 0;
+# Not needed
+currentBit = 8;
+
+# Reading content of the DAT file
 class DATfile:
     def parse(self,bytes_):
         # WorldHeader
         self.Version = int.from_bytes(bytes_.read(4), 'little', signed=False)
         self.ObjectDataPosition = int.from_bytes(bytes_.read(4), 'little', signed=False)
         self.RenderDataPosition = int.from_bytes(bytes_.read(4), 'little', signed=False)
-        self.Dummy = int.from_bytes(bytes_.read(4), 'little', signed=False)
+        self.Dummy = int.from_bytes(bytes_.read(32), 'little', signed=False)
 
         # WorldInfo
         self.Length = int.from_bytes(bytes_.read(4), 'little', signed=False)
         self.Value  = bytes_.read(self.Length).decode()
         self.LMGridSize = struct.unpack("<f",bytes_.read(4))[0]
-        self.BoundaryMin  = bytes_.read(12)
-        self.BoundaryMax  = bytes_.read(12)
+        self.BoundaryMinX  = struct.unpack("<f",bytes_.read(4))[0]
+        self.BoundaryMinY  = struct.unpack("<f",bytes_.read(4))[0]
+        self.BoundaryMinZ  = struct.unpack("<f",bytes_.read(4))[0]
+        self.BoundaryMaxX  = struct.unpack("<f",bytes_.read(4))[0]
+        self.BoundaryMaxY  = struct.unpack("<f",bytes_.read(4))[0]
+        self.BoundaryMaxZ  = struct.unpack("<f",bytes_.read(4))[0]
 
         # WorldTree
         self.BoxMin  = bytes_.read(12)
@@ -31,10 +42,31 @@ class DATfile:
         self.NumNodes = int.from_bytes(bytes_.read(4), 'little', signed=True)
         self.DummyTerrainDepth = int.from_bytes(bytes_.read(4), 'little', signed=True)
 
-local int currentByte = 0;
-local int currentBit = 8;
-local int currentOffset = 0;
+        # DEBUG Part
+        self.Valueof = int.from_bytes(bytes_.read(1), 'little', signed=True)
 
+# Reading input file
+input_file=open(args.input, 'rb')
+
+# Reading header like a stream of bytes and parsing
+header = DATfile()
+header.parse(io.BytesIO(input_file.read()))
+
+print("Version: {}".format(header.Version))
+print(header.ObjectDataPosition)
+print(header.RenderDataPosition)
+print(header.Dummy)
+print("Length: {}".format(header.Length))
+print("Value: {}".format(header.Value))
+print("LMGridSize: {}".format(header.LMGridSize))
+print("Boundary Min (X/Y/Z): {} / {} / {}".format(header.BoundaryMinX,header.BoundaryMinY,header.BoundaryMinZ))
+print("Boundary Max (X/Y/Z): {} / {} / {}".format(header.BoundaryMaxX,header.BoundaryMaxY,header.BoundaryMaxZ))
+print("NumNodes: {}".format(header.NumNodes))
+print("DummyTerrainDepth: {}".format(header.DummyTerrainDepth))
+print("Valueof: {}".format(header.Valueof))
+
+
+"""
 read_layout(currentByte, currentBit, currentOffset, 0);
 
 WorldModelHeader modelHeader;
@@ -178,3 +210,5 @@ if args.output:
 
 # Closing everything
 input_file.close()
+
+"""
