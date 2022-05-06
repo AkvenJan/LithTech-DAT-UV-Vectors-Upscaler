@@ -19,15 +19,15 @@ currentBit = 8;
 # Reading content of the DAT file
 class DATfile:
     def parse(self,bytes_):
-        # WorldHeader
+        # World Header
         self.Version = int.from_bytes(bytes_.read(4), 'little', signed=False)
         self.ObjectDataPosition = int.from_bytes(bytes_.read(4), 'little', signed=False)
         self.RenderDataPosition = int.from_bytes(bytes_.read(4), 'little', signed=False)
         self.Dummy = int.from_bytes(bytes_.read(32), 'little', signed=False)
 
         # WorldInfo
-        self.Length = int.from_bytes(bytes_.read(4), 'little', signed=False)
-        self.Value  = bytes_.read(self.Length).decode()
+        self.WorldInfoLength = int.from_bytes(bytes_.read(4), 'little', signed=False)
+        self.WorldInfoValue  = bytes_.read(self.WorldInfoLength).decode()
         self.LMGridSize = struct.unpack("<f",bytes_.read(4))[0]
         self.BoundaryMinX  = struct.unpack("<f",bytes_.read(4))[0]
         self.BoundaryMinY  = struct.unpack("<f",bytes_.read(4))[0]
@@ -42,8 +42,76 @@ class DATfile:
         self.NumNodes = int.from_bytes(bytes_.read(4), 'little', signed=True)
         self.DummyTerrainDepth = int.from_bytes(bytes_.read(4), 'little', signed=True)
 
-        # DEBUG Part
-        self.Valueof = int.from_bytes(bytes_.read(1), 'little', signed=True)
+        # DEBUG Part. We just wait while DEBUG will and with 8 and 1
+        self.DEBUGCount = 1
+        self.DEBUGValue = [int.from_bytes(bytes_.read(1), 'little', signed=True)]
+        self.DEBUGValue.append(int.from_bytes(bytes_.read(1), 'little', signed=True))
+        while (self.DEBUGValue[self.DEBUGCount-1] !=8 or self.DEBUGValue[self.DEBUGCount] != 1):
+            self.DEBUGCount +=1
+            self.DEBUGValue.append(int.from_bytes(bytes_.read(1), 'little', signed=True))
+        
+        # Model Header
+        self.NumModels = int.from_bytes(bytes_.read(4), 'little', signed=True)
+
+        self.NextWorldItem = []
+        self.Padding = []
+        self.InfoFlags = []
+        self.ModelNameLength = []
+        self.ModelNameValue = []
+        self.PointCount = []
+        self.PlaneCount = []
+        self.SurfaceCount = []
+        self.ModelDATA = []
+        self.UserPortalCount = []
+        self.PolyCount = []
+        self.LeafCount = []
+        self.VertCount = []
+        self.TotalVisListSize = []
+        self.LeafListCount = []
+        self.NodeCount = []
+        self.TextureLength = []
+        self.TextureCount = []
+        self.TextureName = []
+        self.Vertex = []
+        self.Plane = []
+
+        i = 0
+        for i in range(self.NumModels):
+            self.NextWorldItem.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.Padding.append(bytes_.read(32))
+            self.InfoFlags.append(bytes_.read(8))
+            self.ModelNameLength.append(int.from_bytes(bytes_.read(2), 'little', signed=True))
+            #self.ModelNameValue.append(bytes_.read(self.ModelNameLength[i]).decode())
+            self.ModelNameValue.append(bytes_.read(self.ModelNameLength[i]))
+
+            self.PointCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.PlaneCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.SurfaceCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.UserPortalCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.PolyCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.LeafCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.VertCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.TotalVisListSize.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.LeafListCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.NodeCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.ModelDATA.append(bytes_.read(44))
+            self.TextureLength.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+            self.TextureCount.append(int.from_bytes(bytes_.read(4), 'little', signed=True))
+
+            #self.TextureName.append(bytes_.read(self.TextureLength[i]).decode())
+            self.TextureName.append(bytes_.read(self.TextureLength[i]))
+
+            # Vertex Loop
+            j = 0
+            for j in range(self.PolyCount[i]):
+                self.Vertex.append(bytes_.read(2))
+
+            # Plane Loop
+            j = 0
+            for j in range(self.PlaneCount[i]):
+                self.Plane.append(bytes_.read(16))
+
+
 
 # Reading input file
 input_file=open(args.input, 'rb')
@@ -56,14 +124,21 @@ print("Version: {}".format(header.Version))
 print(header.ObjectDataPosition)
 print(header.RenderDataPosition)
 print(header.Dummy)
-print("Length: {}".format(header.Length))
-print("Value: {}".format(header.Value))
+print("World Info Length: {}".format(header.WorldInfoLength))
+print("World Info Value: {}".format(header.WorldInfoValue))
 print("LMGridSize: {}".format(header.LMGridSize))
 print("Boundary Min (X/Y/Z): {} / {} / {}".format(header.BoundaryMinX,header.BoundaryMinY,header.BoundaryMinZ))
 print("Boundary Max (X/Y/Z): {} / {} / {}".format(header.BoundaryMaxX,header.BoundaryMaxY,header.BoundaryMaxZ))
-print("NumNodes: {}".format(header.NumNodes))
+print("Number of Nodes: {}".format(header.NumNodes))
 print("DummyTerrainDepth: {}".format(header.DummyTerrainDepth))
-print("Valueof: {}".format(header.Valueof))
+print("DEBUG Value: {}".format(header.DEBUGValue))
+print(header.NumModels)
+print(header.NextWorldItem)
+print(header.ModelNameLength)
+#print(header.ModelNameValue)
+print(header.SurfaceCount)
+print(header.TextureName[0])
+print(header.Vertex[0])
 
 
 """
