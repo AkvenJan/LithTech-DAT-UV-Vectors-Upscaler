@@ -61,7 +61,7 @@ Aliens versus Predator 2
 Notes on scale factor
 ---------------------
 The script edit all the textures of the level, upscaling their UV vectors to the same multiply factor. So you need all the textures to be upscaled by the same factor.
-Maximum size of the LithTech Engine games I encountered was 512x512 (2048x2048 upon 4x upscaling). Engine supports them just fine. However, dtxutil (convertor from TGA to engine specific DTX format) does not support sizes bigger than 1024 neigher is DEDIT (map editor). So in order to convert them you'll need to find modified DEDIT for your game with support for larger textures (NOLF and AvP2 surely have one). You'll only need this if you are upscaling textures yourself.
+Maximum size of the LithTech Engine games I encountered was 512x512 (2048x2048 upon 4x upscaling). Engine supports them just fine. However, dtxutil (convertor from TGA to engine specific DTX format) does not support sizes bigger than 1024 neigher in DEDIT (map editor). So in order to convert them you'll need to find modified DEDIT for your game with support for larger textures (NOLF and AvP2 surely has one). You'll only need this if you are upscaling textures yourself.
 
 This DAT editing is applied only for the levels and level textures.
 Character models, weapons, props and some menu elements use different UV mapping and do not need any DAT editing, they always render and scale right no matter what size of the texture you use (At least in NOLF1 game).
