@@ -7,11 +7,11 @@ Also added DAT v70 (commented last raw of the DAT v66 format so it apply correct
 And added second DAT v66 template for those rare files without BlockTable section (or they generate error upon upscaling)
 
 # Purpose
-This script allows to automatically edit DAT files (map files), upscaling UV vectors for textures, so the textures are rendering correctly if you are trying to use upscaled textures. 
+This script allows to automatically edit DAT files (map files), upscaling UV vectors for textures, so the textures are rendering correctly if you are trying to use upscaled textures.  
 On Lithtech Jupiter you will not need this script because Lithtech Jupiter handles UV mapping in a different way, correctly applying textures.
 
 # Usage
-For now script only available and applyable as original snobel's script for 010 Editor. It's located here, just read readme: 
+For now script only available and applyable as original snobel's script for 010 Editor. It's located here, just read readme:  
 https://github.com/AkvenJan/LithTech-DAT-UV-Vectors-Upscaler/tree/main/research
 
 # Credits
