@@ -1,0 +1,131 @@
+// UpscaleDAT: Fix UV stuff for LithTech 1.0 maps, for use with upscaled textures.
+// 
+// Asks for the scaling factor, files to process (use multiple selection) and the path to save the processed files in.
+// Files in the output dir may be overwritten without warning! Make sure the template is installed.
+
+
+// Misc setup and user input.
+
+const int MaxChar = 1024;
+
+// You need to select the right template for right version of DAT format for your game
+const char Template[MaxChar] = "bspv56.bt"; 
+
+double ScaleFactor = 4.0;
+do {
+  ScaleFactor = InputFloat("Scaling factor", "Enter the scaling factor to use", "4.0");
+}
+while ((int) ScaleFactor == BAD_VALUE);
+
+const TOpenFileNames InFiles = InputOpenFileNames("Select files to fix", "LithTech 1.0 map files (*.dat)|All files (*)");
+
+const char OutDir[MaxChar] = InputDirectory("Select output folder.");
+
+// Process the files.
+
+int Errors = 0;
+int FileNum;
+int Status;
+char InName[MaxChar];
+char BaseName[MaxChar];
+char OutName[MaxChar];
+
+int ModelCnt, ModelNum;
+int SurfCnt, SurfNum;
+int PolyCnt, PolyNum;
+int RootSCnt, RootSNum;
+int RootPCnt, RootPNum;
+
+for(FileNum = 0; FileNum < InFiles.count; ++FileNum) {
+
+  // Open and parse the file.
+  
+//  Strcpy(InName, InFiles.file[FileNum].filename);
+  InName = InFiles.file[FileNum].filename;
+
+  // Opens a file separately even if it is open in the editor.
+  // Does not run the associated template here because that did not work...
+  Status = FileOpen(InName, false, "", true);
+  if (Status < 0) {
+    prinf("ERROR: Failed to open file %s for reading.", InName);
+    ++Errors;
+    continue;
+  }
+  // ...instead run the template explicitly.
+  RunTemplate(Template);
+
+  // Do the stuff...
+  
+  ModelCnt = modelHeader.Count;
+
+  RootSCnt = modelHeader.rootModel.BSPData.SurfaceCount;
+  RootPCnt = modelHeader.rootModel.BSPData.PolyCount;
+
+    for (RootSNum = 0; RootSNum < RootSCnt; ++RootSNum) {
+  
+      modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV2.x *= ScaleFactor;  
+      modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV2.y *= ScaleFactor;  
+      modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV2.z *= ScaleFactor;  
+
+      modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV3.x *= ScaleFactor;  
+      modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV3.y *= ScaleFactor;  
+      modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV3.z *= ScaleFactor;  
+
+    }
+
+    // Leftover from testings
+    //for (RootPNum = 0; RootPNum < RootPCnt; ++RootPNum) {
+      //modelHeader.rootModel.BSPData.Poly[RootPNum].LightmapWidth *= ScaleFactor;
+      //modelHeader.rootModel.BSPData.Poly[RootPNum].LightmapHeight *= ScaleFactor;
+    //}
+
+
+  for (ModelNum = 0; ModelNum < ModelCnt; ++ModelNum) {
+
+    SurfCnt = modelHeader.model[ModelNum].BSPData.SurfaceCount;
+    PolyCnt = modelHeader.model[ModelNum].BSPData.PolyCount;
+  
+    for (SurfNum = 0; SurfNum < SurfCnt; ++SurfNum) {
+  
+      modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UV2.x *= ScaleFactor;  
+      modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UV2.y *= ScaleFactor;  
+      modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UV2.z *= ScaleFactor;  
+
+      modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UV3.x *= ScaleFactor;  
+      modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UV3.y *= ScaleFactor;  
+      modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UV3.z *= ScaleFactor;  
+
+    }
+
+    // Leftover from testings
+    //for (PolyNum = 0; PolyNum < PolyCnt; ++PolyNum) {
+      //modelHeader.model[ModelNum].BSPData.Poly[PolyNum].LightmapWidth *= ScaleFactor;
+      //modelHeader.model[ModelNum].BSPData.Poly[PolyNum].LightmapHeight *= ScaleFactor;
+    //}
+
+  }
+
+  // Save under the same name in the output dir and clean up.
+
+  BaseName = FileNameGetBase(InName);
+  OutName = OutDir;
+  OutName += BaseName;
+
+  Status = FileSave(OutName);
+  if (Status < 0) {
+    prinf("ERROR: Failed to write the file %s.", OutName);
+    ++Errors;
+  }
+
+  FileClose();
+
+}
+
+// Status report.
+
+if (Errors) {
+  MessageBox(idOk, "Ouch...", "%d errors encountered during processing.\nPlease check the output window.", Errors);
+}
+else {
+  MessageBox(idOk, "Phew...", "Processing finished without errors.");
+}
