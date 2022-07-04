@@ -86,11 +86,11 @@ for(FileNum = 0; FileNum < InFiles.count; ++FileNum) {
 
     }
 
-    for (RootPNum = 0; RootPNum < RootPCnt; ++RootPNum) {
+    //for (RootPNum = 0; RootPNum < RootPCnt; ++RootPNum) {
   
       //modelHeader.rootModel.BSPData.Poly[RootPNum].LightmapWidth *= ScaleFactor;
       //modelHeader.rootModel.BSPData.Poly[RootPNum].LightmapHeight *= ScaleFactor;
-    }
+    //}
 
 
   for (ModelNum = 0; ModelNum < ModelCnt; ++ModelNum) {
@@ -123,11 +123,11 @@ for(FileNum = 0; FileNum < InFiles.count; ++FileNum) {
 
     }
 
-    for (PolyNum = 0; PolyNum < PolyCnt; ++PolyNum) {
+    //for (PolyNum = 0; PolyNum < PolyCnt; ++PolyNum) {
   
       //modelHeader.model[ModelNum].BSPData.Poly[PolyNum].LightmapWidth *= ScaleFactor;
       //modelHeader.model[ModelNum].BSPData.Poly[PolyNum].LightmapHeight *= ScaleFactor;
-    }
+    //}
 
   }
 
