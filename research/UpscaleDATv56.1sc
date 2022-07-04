@@ -1,4 +1,4 @@
-// UpscaleDAT: Fix UV stuff for LithTech 1.0 maps, for use with upscaled textures.
+// UpscaleDAT: Fix UV stuff for NOLF maps, for use with upscaled textures.
 // 
 // Asks for the scaling factor, files to process (use multiple selection) and the path to save the processed files in.
 // Files in the output dir may be overwritten without warning! Make sure the template is installed.
@@ -62,7 +62,7 @@ for(FileNum = 0; FileNum < InFiles.count; ++FileNum) {
   RootPCnt = modelHeader.rootModel.BSPData.PolyCount;
 
     for (RootSNum = 0; RootSNum < RootSCnt; ++RootSNum) {
-  
+
       modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV2.x *= ScaleFactor;  
       modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV2.y *= ScaleFactor;  
       modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV2.z *= ScaleFactor;  
@@ -71,13 +71,26 @@ for(FileNum = 0; FileNum < InFiles.count; ++FileNum) {
       modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV3.y *= ScaleFactor;  
       modelHeader.rootModel.BSPData.Surfaces[RootSNum].UV3.z *= ScaleFactor;  
 
+      //Leftover from some tests
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec1.x *= ScaleFactor;  
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec1.y *= ScaleFactor;  
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec1.z *= ScaleFactor;  
+
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec2.x *= ScaleFactor;  
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec2.y *= ScaleFactor;  
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec2.z *= ScaleFactor;    
+
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec3.x *= ScaleFactor;  
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec3.y *= ScaleFactor;  
+      //modelHeader.rootModel.BSPData.Surfaces[RootSNum].UnkVec3.z *= ScaleFactor;    
+
     }
 
-    // Leftover from testings
-    //for (RootPNum = 0; RootPNum < RootPCnt; ++RootPNum) {
+    for (RootPNum = 0; RootPNum < RootPCnt; ++RootPNum) {
+  
       //modelHeader.rootModel.BSPData.Poly[RootPNum].LightmapWidth *= ScaleFactor;
       //modelHeader.rootModel.BSPData.Poly[RootPNum].LightmapHeight *= ScaleFactor;
-    //}
+    }
 
 
   for (ModelNum = 0; ModelNum < ModelCnt; ++ModelNum) {
@@ -95,13 +108,26 @@ for(FileNum = 0; FileNum < InFiles.count; ++FileNum) {
       modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UV3.y *= ScaleFactor;  
       modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UV3.z *= ScaleFactor;  
 
+      //Leftover from some tests
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec1.x *= ScaleFactor;  
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec1.y *= ScaleFactor;  
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec1.z *= ScaleFactor;  
+
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec2.x *= ScaleFactor;  
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec2.y *= ScaleFactor;  
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec2.z *= ScaleFactor;    
+
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec3.x *= ScaleFactor;  
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec3.y *= ScaleFactor;  
+      //modelHeader.model[ModelNum].BSPData.Surfaces[SurfNum].UnkVec3.z *= ScaleFactor;    
+
     }
 
-    // Leftover from testings
-    //for (PolyNum = 0; PolyNum < PolyCnt; ++PolyNum) {
+    for (PolyNum = 0; PolyNum < PolyCnt; ++PolyNum) {
+  
       //modelHeader.model[ModelNum].BSPData.Poly[PolyNum].LightmapWidth *= ScaleFactor;
       //modelHeader.model[ModelNum].BSPData.Poly[PolyNum].LightmapHeight *= ScaleFactor;
-    //}
+    }
 
   }
 
