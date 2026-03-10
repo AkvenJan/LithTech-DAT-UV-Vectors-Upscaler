@@ -14,8 +14,10 @@ On Lithtech Jupiter you will not need this script because Lithtech Jupiter handl
 For now script only available and applyable as original snobel's script for 010 Editor. It's located here, just read readme:  
 https://github.com/AkvenJan/LithTech-DAT-UV-Vectors-Upscaler/tree/main/research  
 There are two versions of this script:  
-  UpscaleDATv54.sc - fo DAT v56  
-  UpscaleDAT.1sc - for DAT v66 and DAT v70  
+* UpscaleDATv56.sc - fo DAT v56  
+* UpscaleDAT.1sc - for DAT v66 and DAT v70
+
+dataup.py is incomplete, don't use it
 
 # Credits
 Upscale script for 010 Editor was originally made by by snobel (https://www.ttlg.com/forums/member.php?u=40710)
