@@ -19,7 +19,7 @@ There are two versions of this script:
 
 Example of usage: https://www.moddb.com/mods/blood-ii-the-chosen-upscale-pack
 
-dataup.py is incomplete, don't use it
+'dataup.py' is incomplete, don't use it
 
 # Credits
 Upscale script for 010 Editor was originally made by by snobel (https://www.ttlg.com/forums/member.php?u=40710)
