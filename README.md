@@ -12,7 +12,10 @@ On Lithtech Jupiter you will not need this script because Lithtech Jupiter handl
 
 # Usage
 For now script only available and applyable as original snobel's script for 010 Editor. It's located here, just read readme:  
-https://github.com/AkvenJan/LithTech-DAT-UV-Vectors-Upscaler/tree/main/research
+https://github.com/AkvenJan/LithTech-DAT-UV-Vectors-Upscaler/tree/main/research  
+There are two versions of this script:  
+  UpscaleDATv54.sc - fo DAT v56  
+  UpscaleDAT.1sc - for DAT v66 and DAT v70  
 
 # Credits
 Upscale script for 010 Editor was originally made by by snobel (https://www.ttlg.com/forums/member.php?u=40710)
@@ -48,4 +51,4 @@ Upscale script for 010 Editor was originally made by by snobel (https://www.ttlg
     	Tron 2.0
     	Medal of Honor: Pacific Assault
 
-But on practice I only tried them on DAT v66 and DAT v70 only
+But on practice I only tried them on DAT v56, DAT v66 and DAT v70 only
