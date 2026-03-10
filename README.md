@@ -17,6 +17,8 @@ There are two versions of this script:
 * UpscaleDATv56.sc - fo DAT v56  
 * UpscaleDAT.1sc - for DAT v66 and DAT v70
 
+Example of usage: https://www.moddb.com/mods/blood-ii-the-chosen-upscale-pack
+
 dataup.py is incomplete, don't use it
 
 # Credits
