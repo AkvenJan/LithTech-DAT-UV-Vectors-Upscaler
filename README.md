@@ -76,5 +76,5 @@ From https://github.com/StenApp
 > 
 > In short: Use UV if you want the texture to stick and stretch with the shape; use OPQ for architectural surfaces where you want the texture to remain consistent and undistorted across the environment.
 
-* Lithtech (everything lesser than DAT v85) - OPQ Mapping
-* Lithtech Jupiter (DAT v85 and higher) - UV Mapping
+* Lithtech (everything lesser than DAT v85) - levels use OPQ Mapping
+* Lithtech Jupiter (DAT v85 and higher) - levels use UV Mapping
