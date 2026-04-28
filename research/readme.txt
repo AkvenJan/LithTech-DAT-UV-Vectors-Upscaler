@@ -1,11 +1,11 @@
-LithTech DAT UV vectors Upscaler (for 010 Editor)
+LithTech DAT UV/OPQ vectors Upscaler (for 010 Editor)
 =================================================
 by snobel
 =========
 
 Purpose
 -------
-This script allows to automatically edit DAT files (map files) for LithTech engine games, upscaling UV vectors for textures, so the textures are rendering correctly if you are trying to upscale them.
+This script allows to automatically edit DAT files (map files) for LithTech engine games, upscaling UV/OPQ vectors for textures, so the textures are rendering correctly if you are trying to upscale them.
 On Lithtech Jupiter you will not need this script because Lithtech Jupiter handles UV mapping in a different way, correctly applying textures.
 
 Theoretically supports this versions:
@@ -68,7 +68,7 @@ Character models, weapons, props and some menu elements use different UV mapping
 
 Issues
 ------
-1. For few NOLF1 levels I needed to use bspv66_noblock.bt template because of non-standard dat format with commented PBlockTable BlockTable section (this DAT files doesn't had it). In case you encounter non-standard files you'll need to do your own research or ask someone.
+1. For few NOLF1 levels I needed to use bspv66_noblock.bt template because of non-standard dat format with commented PBlockTable BlockTable section (this DAT files doesn't had it). In case you encounter non-standard files you'll need to do your own research or ask someone. EDIT!!! Template was fixed by https://github.com/StenApp You don't need bspv66_noblock.bt anymore
 2. For textures to render correctly you also need DTX files to retain their meta information (more info here: https://github.com/AkvenJan/DTX-Meta-Transfer). If your are using someone else's upscaled textures and just want to make level compatible with them - you don't have to worry about it.
 
 P.S.

@@ -1,3 +1,19 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: bspv66.bt
+//   Authors: Unknown + StenApp
+//   Version: 2.0
+//   Purpose: Parse LithTech DAT v66 level files
+//  Category: Textures
+// File Mask: *.dat
+//  ID Bytes: 42 00 00 00
+//   History: 
+//				1.0: Initial release
+//				1.0 No Block: Duplicate Template was added for specific files with errors
+//				2.0: No Block errors were fixed. You don't need duplicate version anymore
+//------------------------------------------------
+
 struct LTVector {
     float x, y, z;
 };
@@ -8,7 +24,9 @@ struct LTQuaternion {
 
 struct LTString {
     short Length;
-    char Value[Length];
+    if (Length > 0) {
+        char Value[Length];
+    }    
 };
 
 typedef uint32 uint32_t;
@@ -71,7 +89,9 @@ struct Vertex {
 struct LeafData {
     short PortalID;
     ushort Size;
-    uchar Contents[Size];
+    if (Size > 0) {
+        uchar Contents[Size];
+    }
 };
 
 struct Leaf {
@@ -84,7 +104,9 @@ struct Leaf {
     }
 
     int PolygonCount;
-    char Polygons[PolygonCount * 4] <optimize=false>;
+    if (PolygonCount > 0) {
+        char Polygons[PolygonCount * 4] <optimize=false>;
+    }
     int Unk1;
 };
 
@@ -152,39 +174,40 @@ struct Node {
     int NodeIndexes[2];
 };
 
+
 struct UserPortal {
     LTString Name;
-    int Unk1;
-    int Unk2;
-    ushort Unk3;
+    int Unk1;    // possibly leaf index
+    short Unk2;  // possibly leaf index
     LTVector Center;
     LTVector Dims;
 };
 
 struct PBlockContents {
-    uchar VertIndex;
-    uchar Padding;
-    uchar Quat[4];
+    short NodeIndex;
+    short Child0;
+    short Child1;
 };
 
-
 struct PBlock {
-    short Size;
-    short Unk1;
-    PBlockContents Contents[Size];
+    ushort Size;
+    ushort Max;
+    if (Size > 0) {
+        PBlockContents Contents[Size];
+    }
 };
 
 struct PBlockTable {
-    //LTVector UnkVec[8]; // Physics?
-    int Unk1;
-    int Unk2;
-    int Unk3;
-
-    local int Size = Unk1*Unk2*Unk3;
+    int GridX;
+    int GridY;
+    int GridZ;
+    local int Size = GridX * GridY * GridZ;
     
-    LTVector Unk4;
-    LTVector Unk5;
-    PBlock Block[Size] <optimize=false>;
+    LTVector BoundsMax;
+    LTVector BoundsMin;
+    if (Size > 0) {
+        PBlock Block[Size] <optimize=false>;
+    }
 };
 
 struct WorldBSP {
@@ -216,7 +239,9 @@ struct WorldBSP {
     WorldTexture WorldTextures(TextureNameLength);
     Vertex Vertices[PolyCount];
 
-    Leaf LeafList[LeafCount] <optimize=false>;
+    if (LeafCount > 0) {
+        Leaf LeafList[LeafCount] <optimize=false>;
+    }
     
     Plane Planes[PlaneCount];
     Surface Surfaces[SurfaceCount] <optimize=false>;
@@ -226,9 +251,13 @@ struct WorldBSP {
     for (i = 0; i < PolyCount; i++) {
         Polygon Poly(Vertices[i]);
     }
-
-    Node Nodes[NodeCount];
-    UserPortal Portals[UserPortalCount];
+    
+    if (NodeCount > 0) {
+        Node Nodes[NodeCount];
+    }    
+    if (UserPortalCount > 0) {
+        UserPortal Portals[UserPortalCount] <optimize=false>;
+    }
     Point Points[PointCount];
     PBlockTable BlockTable;
     int RootNodeIndex;
@@ -399,16 +428,12 @@ void subdivide() {
 */
 };
 
-struct DEBUG_BYTE {
-    byte val;
-};
-
 void read_layout(int &current_byte, int &current_bit, int &current_offset, int depth)
 {
     if (current_bit == 8)
     {
-        DEBUG_BYTE subdivision_data;
-        current_byte = subdivision_data.val;//ReadByte();
+        byte data;
+        current_byte = data;
         current_bit = 0;
     }
 
@@ -418,10 +443,7 @@ void read_layout(int &current_byte, int &current_bit, int &current_offset, int d
         subdivide = true;
     }
 
-    //local int subdivide = (current_byte & (1 << current_bit)) > 0;
     current_bit++;
-
-    //Printf("Depth %d", depth);
 
     if (depth > 16) {
         return;
@@ -444,13 +466,13 @@ WorldHeader header;
 WorldInfo info;
 WorldTree tree;
 
-
-
 local int currentByte = 0;
 local int currentBit = 8;
 local int currentOffset = 0;
 
-read_layout(currentByte, currentBit, currentOffset, 0);
+struct {
+    read_layout(currentByte, currentBit, currentOffset, 0);
+} subdivision_data <comment="Subdivision tree data">;
 
 WorldModelHeader modelHeader;
 
