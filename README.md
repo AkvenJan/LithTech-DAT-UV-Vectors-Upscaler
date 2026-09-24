@@ -52,6 +52,11 @@ Upscale script for 010 Editor was originally made by by snobel (https://www.ttlg
     Lithtech Talon (DAT v70), uses DTX v2
     	Aliens versus Predator 2
 
+    Lithtech Jupiter (DAT v85), uses DTX v2
+    	No One Lives Forever 2: A Spy In H.A.R.M.'s Way
+		Contract J.A.C.K.
+    	Tron 2.0
+
 But on practice I only tried them on DAT v56, DAT v66 and DAT v70 only
 
 # UV Vectors vs OPQ Vectors
