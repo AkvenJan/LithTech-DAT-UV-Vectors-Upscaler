@@ -29,32 +29,28 @@ Upscale script for 010 Editor was originally made by by snobel (https://www.ttlg
     Lithtech 1.0 (DAT v56), uses DTX v1
     	Shogo: Mobile Armor Division
     	Blood II: The Chosen
+		Sanity: Aiken's Artifact (had some Lithtech 2.0 enhancements)
 
+	Lithtech 1.0 (DAT v57), uses DTX v1
+		TNN Outdoors Pro Hunter 2
+    	
     Kiss Psycho Circus (Custom 1.5) (DAT v127), uses DTX v1.5
     	KISS: Psycho Circus: The Nightmare Child 
-
-    Lithtech 1.5 (DAT v66), uses DTX v1.5
-	The engine is 1.5 but textures and levels are packed as LithTech 2x resourсes
+	
+	Lithtech 1.5 (DAT v66), uses DTX v2  
+    The engine is 1.5 but textures and levels are packed as LithTech 2x resourсes
     	Might and Magic IX
 
     Lithtech 2.x (DAT v66), uses DTX v2
     	NOLF1
-    	Sanity: Aiken's Artifact 
     	Legends of Might and Magic
     	Die Hard: Nakatomi Plaza
 
-    Lithtech PS2 (LTB v66)
+    Lithtech PS2 (LTB v66), uses DTX v2 (mainly 32palletized)
     	NOLF1 (PS2)
 
     Lithtech Talon (DAT v70), uses DTX v2
     	Aliens versus Predator 2
-
----
-
-    Lithtech Jupiter (DAT v85), uses DTX v2
-    	No One Lives Forever 2: A Spy In H.A.R.M.'s Way
-    	Tron 2.0
-    	Medal of Honor: Pacific Assault
 
 But on practice I only tried them on DAT v56, DAT v66 and DAT v70 only
 
