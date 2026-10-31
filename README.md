@@ -5,25 +5,36 @@ Research on DAT files for various versions of LithTech engine for 010 Editor. I 
 https://github.com/haekb/godot-dat-reader/tree/master/Research  
 Also added DAT v70 (commented last raw of the DAT v66 format so it apply correctly - and you don't need renderData for upscale script to work)  
 
-And added second DAT v66 template for those rare files without BlockTable section (or they generate error upon upscaling). Update: You don't need second template anymore, main template was fixed by https://github.com/StenApp
+# Purpose \ Why this is needed
+In LithTech, UV coordinates and effect parameters are stored in the map's DAT file at the original scale. If you simply swap in upscaled textures, they will appear too small (or too large), and the scrolling speed of "Pan" effects will be wrong. These scripts fix both issues.
 
-# Purpose
-This script allows to automatically edit DAT files (map files), upscaling UV/OPQ vectors for textures, so the textures are rendering correctly if you are trying to use upscaled textures.  
+This scripts allows to automatically edit DAT files (map files), upscaling UV/OPQ vectors for textures, so the textures are rendering correctly if you are trying to use upscaled textures. Script also fix Pan effect (upscaled textures move faster on animated textures).  
 On Lithtech Jupiter you will not need this script because Lithtech Jupiter handles UV mapping in a different way, correctly applying textures.
 
 # Usage
-For now script only available and applyable as original snobel's script for 010 Editor. It's located here, just read readme:  
+## 1. UV scaling
+>python fix_uv-dat66.py <scale> <file1.dat> [file2.dat ...] [-o <out_dir>]
+
+## 2. Pan effect fix
+>python fix_pan-dat66.py <divisor> <input.dat> <output.dat>
+
+## Example
+If you upscaled textures four times - you need to multiply UV vectors by 4 and divide pan effect values by 4  
+>python fix_uv-dat66.py 4 M01S03.DAT -o fixed/  
+>python fix_pan-dat66.py 4 M01S03.DAT -o M01S03-fixed.DAT
+
+## Old script
+Script for UV scaling also available and applyable as original snobel's script for 010 Editor. It's located here, just read readme:  
 https://github.com/AkvenJan/LithTech-DAT-UV-Vectors-Upscaler/tree/main/research  
 There are two versions of this script:  
 * UpscaleDATv56.sc - fo DAT v56  
 * UpscaleDAT.1sc - for DAT v66 and DAT v70
 
-Example of usage: https://www.moddb.com/mods/blood-ii-the-chosen-upscale-pack
-
-`dataup.py` is incomplete, don't use it
+Example of usage in mod: https://www.moddb.com/mods/blood-ii-the-chosen-upscale-pack
 
 # Credits
-Upscale script for 010 Editor was originally made by by snobel (https://www.ttlg.com/forums/member.php?u=40710)
+Upscale script for 010 Editor was originally made by by snobel (https://www.ttlg.com/forums/member.php?u=40710)  
+A lot of information was given by https://github.com/StenApp. He also fixed some issues for DAT v66
 
 # LithTech versions
     Lithtech 1.0 (DAT v56), uses DTX v1
