@@ -1,0 +1,657 @@
+//------------------------------------------------
+//--- 010 Editor v10.0 Binary Template
+//
+//      File: PS2 LTB
+//   Authors: Jake Breen
+//   Version: 
+//   Purpose: 
+//  Category: 
+// File Mask: *.ltb
+//  ID Bytes: 
+//   History: 
+//------------------------------------------------
+// PS2 LTB
+typedef unsigned char		uint8;
+//typedef unsigned short int	uint16;
+//typedef unsigned int		uint32;
+
+struct Vector4 {
+    float x,y,z,w;
+};
+
+struct Vector3 {
+    float x,y,z;
+};
+struct TexCoord {
+    float u,v;
+};
+
+struct Quat {
+    float x,y,z,w;
+};
+
+// I'm bad at names, but this must mean something for the PS2.
+// VIFCodes: https://gtamods.com/wiki/PS2_Native_Geometry
+//
+// 0x11 = Flush - wait for end of microprogram and GIF transfer
+// 0x15 = MSCALF - call micro program
+// 0x6C = Unpack? - unpack the following data and write to VU memory
+//
+struct CommandSignal {
+    short constant1;
+    uchar variable;
+    uchar VIFCode;
+};
+
+struct Section {
+    short StringCount;
+    char String[StringCount];
+};
+
+struct Header {
+    uint32 FileType;
+    uint32 Version;
+    uint32 unkPadding[3];
+    uint32 OffsetOffset; // Offset Section Offset...
+    uint32 PieceOffset; // Maybe?
+    uint32 NodeOffset; 
+    uint32 SubModelOffset;
+    uint32 AnimationOffset;
+    uint32 SocketOffset;
+    uint32 FileSize;
+    uint32 padding;//[11];
+    
+};
+
+struct ModelInfo {
+    //uint32 Version;
+    uint32 KeyframeCount;
+    uint32 AnimationCount;
+    uint32 NodeCount;
+    uint32 PieceCount;
+    uint32 ChildModelCount;
+    uint32 TriangleCount;
+    uint32 VertexCount;
+    uint32 WeightCount;
+    uint32 LODCount; // This should be 1, but I have seen a prop with 2!!! D: 
+    uint32 SocketCount;
+    uint32 WeightSetCount;
+    uint32 StringCount;
+    uint32 StringLengthCount;
+    uint32 unknown;
+    short CommandStringLength;
+    char CommandString[CommandStringLength];
+
+    float InternalRadius;
+};
+
+struct FaceVertex {
+    TexCoord UVCoord;
+    uint16 VertexIndex;
+};
+
+struct Face {
+    FaceVertex vertex[3];
+};
+
+struct MeshData
+{
+    Vector3 VertexData;
+    float VertexPadding;
+    Vector3 NormalData;
+    float NormalPadding;
+    TexCoord UVData;
+    float UVPadding;
+    uint32 Unknown;
+};
+
+struct MeshSet
+{
+    uchar DataCount;
+    uchar UnknownFlag; // If 128, then it's the last Set!
+    short Padding;
+    uint32 Unknown1;
+    uint32 WindingOrder;
+    uint32 Unknown3;
+    
+};
+
+// LOD Zone!
+
+// After Piece and LODSkeletal, this is filled just before LODGlue!
+struct LODStart {
+    uint32 VertexCount;
+    uint32 WeightedNodesCount;
+    // Moved these to LODGlue
+    //uint32 Unknown2;
+    //uint32 Unknown[6];
+};
+
+// If there's any remaining data this will be filled just before LOD!
+struct LODGlue {
+    CommandSignal UnknownSignal; // Maybe?
+    uint32 Unknown2;
+    CommandSignal FlushSignal; // Not useful for us, but good to know. Empty if there's no need to flush
+    uint32 Unknown[4];
+};
+
+struct LOD {
+    CommandSignal UnpackSignal;
+    uint32 MeshSetCount;
+    uint32 MeshDataCount;
+    uint32 Zero[2];
+};
+
+struct LODSkeletal {
+    uint32 SkelUnk;
+    uint32 UnknownSectorSize; // This number may need to be rounded or aligned
+    //uint32 SkelUnknown[2];
+};
+// End LOD Zone!
+
+struct ModelInfoExtended {
+    uint32 HashValue; // Use rezCalcHash (from ps2rezdecoder) function with this value.
+    uint32 unk1;
+    uint32 unk2;
+};
+
+struct PieceInfo {
+    uint32 PieceCount;
+};
+
+struct Piece {
+    uint32 NodeReference;//Padding1;
+    float SpecularPower;
+    float SpecularScale;
+    float LODWeight;
+    float unkFloatyPadding[9];
+    uint32 TextureIndex; // Maybe?
+    uint32 Unknown[2];
+    int Four;
+    int MeshType; // Basically confirmed
+};
+
+struct Node {
+    uint16 NameLength;
+    char   Name[NameLength];
+    //uint16 Index;
+    //ubyte flag;    
+//uint16 UnknownPadding;
+    Vector4 Matrix[4];
+    uint32 ParentPiece;
+    //ubyte unkB1;
+    //ubyte unkB2;
+    //ushort unk2;
+    uint32 ChildCount;
+    short Index; // 
+    short Unk; // Maybe flag?
+};
+
+struct NodeOther {
+    uint32 WeightSetCount;
+
+};
+
+struct NodeWeight {
+
+};
+
+// Currently only Anim-Weightset?
+struct WeightSet {
+    uint32 ID;
+    uint32 NodeCount;
+    float Weights[NodeCount];
+};
+
+// Unknown data at the end of a mesh set..only sometimes though.
+struct MeshSetExtended
+{
+    float Unknown1;
+    float Unknown2;
+    float Unknown3;
+    float Unknown4;
+};
+
+struct EndSignal {
+    uint32 Padding[3];
+    CommandSignal signal;
+};
+//440
+
+
+struct ExtraVertNorm {
+    Vector3 VertexData;
+    float VertexPadding;
+    Vector3 NormalData;
+    float NormalPadding;
+};
+
+struct ExtraVertNormWrapper (uint32 count) {
+    ExtraVertNorm list[count] <optimize=false>;
+};
+
+
+struct RandomOne {
+    uint32 One;
+};
+
+struct ExtraFaceData {
+    uint32 Unk;
+    //short sUnk;
+};
+
+struct TheUnknown {
+    short unk[2];
+    // 525 = Floats
+    //float whatevesfloaty[228];
+    //uint32 one;
+};
+
+struct HeroEights {
+    uint32 Ignore;
+    Vector3 Heroes;
+};
+
+struct Socket {
+/*
+        socket = Socket()
+        socket.node_index = unpack('I', f)[0]
+        socket.name = self._read_string(f)
+        socket.rotation = self._read_quaternion(f)
+        socket.location = self._read_vector(f)
+*/
+    uint32 unk1;
+    Quat rotation;
+    Vector3 location;
+    uint32 padding;
+    uint32 nodeIndex;
+    uint32 hashedString;
+    uint32 unk3;
+};
+
+
+
+struct ChildModel {
+    short stringLength;
+    char Name[stringLength];
+};
+struct ChildModelHeader {
+    uint32 Count;
+};
+
+struct AnimationHeader {
+    uint32 Count;
+};
+
+struct KeyFrame {
+    uint32 Time;
+    short StringCount;
+    char String[StringCount];
+};
+
+struct ThreeByte {
+    short x;
+    char xPlus;
+    short y;
+    char yPlus;
+    short z;
+    char zPlus;
+};
+
+
+
+struct CompressedFrame {
+    // Scale by 0x1000 if flag is 0
+    // Scale by 0x10 if flag is 1
+    short Location[3]; 
+    short LocationScaleFlag;
+    // Scale by 0x4000
+    short Rotation[4]; 
+};
+
+struct CVector3 {
+    short x,y,z;
+};
+
+struct CQuat {
+    short x,y,z,w;
+};
+
+
+struct NodeKeyframe (uint32 Count)
+{
+    uint32 StartMarker;
+    
+    //int16 unk[34];
+    // This should be per node...
+    CompressedFrame Frames[KeyFrameCount];//[nodeCount];
+};
+
+// Around 543 long
+struct Animation (uint32 nodeCount) {
+    Vector3 Dims;
+    Vector3 Translation;
+    uint32 HashedString;
+    uint32 InterpolationTime;
+    uint32 KeyFrameCount;
+    KeyFrame KeyFrames[KeyFrameCount] <optimize=false>;
+    //uint32 Unk2;
+    
+    // Maybe they're just compressed?
+    //CVector3 Locations[KeyFrameCount];
+    //CQuat Rotations[KeyFrameCount];
+
+
+    //short test;
+    NodeKeyframe Nodes(KeyFrameCount)[nodeCount] <optimize=false>;
+};//5052
+
+struct WeightHeader {
+    uint32 Count;
+};
+
+struct VertexWeights {
+    // Weights add up to 4096
+    short firstWeight;
+    short secondWeight;
+    short thirdWeight;
+    short forthWeight;
+    // -1 = Not used
+    char firstNode;
+    char secondNode;
+    char thirdNode;
+    char forthNode;
+};
+
+struct VertexWeightsWrapper (uint32 count) {
+    VertexWeights weights[count] <optimize=false>;
+};
+
+struct UnknownSector {
+    short unknownValues[2];
+};
+
+struct UnknownSectorWrapper (uint32 count) {
+    UnknownSector unk[count] <optimize=false>;
+};
+
+struct UnknownSectorAlt {
+    short Count;
+    short Values[Count];
+};
+
+// trhis is a test I'm testing without mouse control enabled
+//Section section;
+Header hdr;
+ModelInfo info;
+
+ModelInfoExtended infoEx;
+
+FSeek(hdr.PieceOffset);
+PieceInfo pieceInfo;
+
+local int i = 0;
+local int j = 0;
+local int count = 0;
+local int meshSetIndex = 0;
+local uint32 meshSetCheck = 0;
+
+local int setStart = 0;
+local int setEnd = 0;
+local int setSize = 0;
+
+Printf("Size Of LODStart   %d \n", sizeof(LODStart));
+Printf("Size of LODGlue    %d \n", sizeof(LODGlue));
+Printf("Size Of LOD        %d \n", sizeof(LOD));
+
+local int peekAmount = 0;
+local int checkForMoreData = 0;
+
+// When checking for more data, we fill these up
+// and then check the constant and VIF command.
+local short UnpackConstant = 0;
+local uchar UnpackVariable = 0;
+local uchar UnpackVIFCommand = 0;
+
+// End Signal Check
+local uint32 EndSignalZero[3] = { 0, 0, 0 };
+local uint32 EndSignalData = 0;
+
+local int breakFromPieces = 0;
+local float heroEight1 = 0.0f;
+local float heroEight2 = 0.0f;
+local float heroEight3 = 0.0f;
+
+local float testFloat = 0.0f;
+local int test = 0;
+
+local int totalStuff = 0;
+
+local int testZero1 = 0;
+local int testZero2 = 0;
+local float testAfter = 0.0f;
+
+local int pad = 0;
+
+// Commented out so I can work on non-geom stuff
+
+// Okay, let's loop through the pieces
+//for(i = 0; i < pieceInfo.PieceCount; i++)
+if (false)
+{
+    Printf("----------\nNew Piece\n");
+
+    // Reset some vars
+    checkForMoreData = 0;
+    test= 0;
+
+    //FSeek( FTell() - 4 );
+
+    if (breakFromPieces)
+    {
+        break;
+    }
+
+    //
+
+    Piece piece;
+
+    if (piece.MeshType == 5)
+    {
+        LODSkeletal lodSkeletal;
+    }
+
+    LODStart lodStart;
+
+    // Per LOD?
+    while (true)
+    {
+        // If they reached about 13kb of data
+        // then check ahead to see if they have an unpack VIF command
+        // that *usually* signifies there's more data.
+        if (checkForMoreData)
+        {
+            peekAmount = sizeof(LODGlue);
+            UnpackConstant = ReadShort(FTell() + peekAmount);
+            UnpackVariable = ReadUByte(FTell() + peekAmount + 2);
+            UnpackVIFCommand = ReadUByte(FTell() + peekAmount + 3);
+
+            if (UnpackConstant != 80 || UnpackVIFCommand != 108)
+            {
+                break;
+            }
+
+            checkForMoreData = 0;
+        }
+
+        // Clear some local variables
+        count = 0;
+
+        LODGlue lodGlue;
+        LOD lod <optimize=false>;
+        
+        setStart = FTell();
+        // Until DataCount is exhausted
+        while(true)
+        {
+            
+            // Check to see if we have our good header
+            //MeshSetCheck dataCheck;
+            meshSetCheck = ReadUInt(FTell() + 4);
+    
+            if (meshSetCheck != 808337408)
+            {
+                FSkip(4*4);
+            }
+
+            test = 0;
+            MeshSet Data <optimize=false>;
+            for (j = 0; j < Data.DataCount; j++)
+            {
+                testFloat = ReadFloat(FTell() + (4*3));
+                if (testFloat != 1.0f)
+                {
+                    FSeek(FTell() + (4*4));
+                }
+                totalStuff += 1;
+
+                MeshData meshData;
+                //FSeek(FTell() + sizeof(MeshData));
+            }            
+
+            //MeshSet Data <optimize=false>;
+            count += Data.DataCount;
+    
+            if (count >= lod.MeshDataCount)
+            {
+                break;
+            }
+    
+            if (Data.UnknownFlag == 128)
+            {
+                break;
+            }
+    
+            meshSetIndex++;
+            test += Data.DataCount;
+        }
+        
+        // Check ahead for the end signal, sometimes there's an extra 4*4 row of floats.
+        EndSignalZero[0] = ReadUInt(FTell());
+        EndSignalZero[1] = ReadUInt(FTell() + 4);
+        EndSignalZero[2] = ReadUInt(FTell() + 8);
+        EndSignalData = ReadUInt(FTell() + 12);
+
+        if (EndSignalZero[0] != 0 || EndSignalZero[1] != 0 || EndSignalZero[2] != 0 || EndSignalData != 352321536)
+        {
+            MeshSetExtended dataExtended;
+        }
+
+        // 0x15 = call micro program
+        // I assume this let's the ps2 do its uploading
+        EndSignal endSignal;
+
+        
+        setEnd = FTell();
+        
+        // Calculate batch size
+        setSize = setEnd - setStart;
+
+        //Printf("size (%d) = size_end (%d) - size_start (%d)\n", setSize, setEnd, setStart);
+        //Printf("Set Size is %d\n", setSize);
+        
+        // Monolith chose around 13kb as the batch size limit
+        // (The max possible size is 16kb!)
+        // So if we're up there, might be worth checking for more data!
+        if (setSize > 13000)
+        {
+            checkForMoreData = 1;
+        } 
+        else // If we're not at that cap, then we can safely assume there's no more batched data here.
+        {
+           
+            if (piece.MeshType == 5) 
+            {
+                testZero1 = FTell();
+                while (true)
+                {
+                    UnknownSectorAlt unkSector;
+
+                    // While this works kinda, you need to account for some skipping
+                    testZero2 = FTell();
+
+                    if( ((testZero2 - testZero1) / 2) >= lodSkeletal.UnknownSectorSize)
+                    {   
+                        while(true) 
+                        {
+
+                            // Look for the 1.0 vertex padding
+                            testAfter = ReadFloat(FTell() + (4*3));
+                            if (testAfter == 1.0f)
+                            {
+                                Printf("Found 1.0f 3 ints away at %d, 1.0f position: %d\n", FTell(), FTell() + (4*3));
+                                break;
+                            }
+                            // Skip 2 bytes, because there may be a short of line padding...
+                            FSkip(2);
+                        }
+                        // Super hack: Use the remainder value to break through twice.
+                        if (testAfter == 1.0f)
+                        {
+                            break;
+                        }
+                    }
+                }
+                testZero2 = FTell();
+                Printf("Finish unknown sector skip at %d\n", testZero2);
+                Printf("Total size of unknown sector: %d\n", testZero2 - testZero1);
+                //UnknownSectorWrapper unkSector(lodSkeletal.UnknownSectorSize);
+
+                ExtraVertNormWrapper extraMeshData(lodStart.VertexCount) <optimize=false>;
+
+                // Skip past the indexed bone list
+                FSeek(FTell() + (4*lodStart.WeightedNodesCount));
+
+                VertexWeightsWrapper weights(lodStart.VertexCount) <optimize=false>;
+
+            }
+
+            
+            break;
+        }
+
+        
+    }
+}
+
+// 279 = tail
+// 530 = same part
+//return;
+// tnt FSeek(4420);
+FSeek(hdr.NodeOffset - (sizeof(VertexWeights) * info.VertexCount) );
+//VertexWeights weights[info.VertexCount];
+
+FSeek(hdr.NodeOffset);
+Node node[info.NodeCount] <optimize=false>;
+
+// Actually Anim WeightSet, see dog_action.lta / ltb
+NodeOther nodeOther;
+WeightSet weightSets[nodeOther.WeightSetCount];
+
+FSeek(hdr.SubModelOffset);
+ChildModelHeader childModelHdr;
+// For some reason it's off by one
+ChildModel ChildModels[info.ChildModelCount - 1] <optimize=false>;
+
+FSeek(hdr.AnimationOffset);
+AnimationHeader animationHdr;
+
+// 162 bytes per animation for poodle
+
+Animation animation(info.NodeCount)[info.AnimationCount] <optimize=false>;
+
+
+
+FSeek(hdr.SocketOffset);
+Socket sockets[info.SocketCount] <optimize=false>;
+ 
