@@ -1,0 +1,461 @@
+//------------------------------------------------
+//--- 010 Editor Binary Template
+//--- LithTech 2.0 LTB D3D Model File (Die Hard: Nakatomi Plaza)
+//--- Based Vase2.LTB
+//------------------------------------------------
+typedef unsigned char uint8;
+
+
+
+typedef unsigned short uint16;
+typedef unsigned int   uint32;
+
+ 
+//LTB Wrapper
+struct LTBPrefix {
+    uint16 len;              
+    char   text[len];        // "LTBHeader"
+    uint32 MeshVersion;      
+};
+
+enum <uint16> E_LTB_FILE_TYPES {
+    LTB_D3D_MODEL_FILE = 1, 
+    LTB_PS2_MODEL_FILE = 2, 
+    LTB_XBOX_MODEL_FILE = 3, 
+    LTB_ABC_MODEL_FILE = 4, 
+    LTB_D3D_RENDERSTYLE_FILE = 5, 
+    LTB_PS2_RENDERSTYLE_FILE = 6, 
+    LTB_D3D_RENDEROBJECT_FILE = 7 };
+
+struct LTB_Header {
+    E_LTB_FILE_TYPES FileType;    // 4 = ABC_MODEL_FILE, 1--> D3D model
+    uint16 Version;     // LTB-Container-Version -> 13 bei Die Hard
+    uint32 Reserved1;
+    uint32 Reserved2;
+    uint32 Reserved3;
+    uint32 Reserved4;
+    
+    
+};
+
+struct Section {
+    short stringLength;
+    char Type[stringLength] <optimize=false>;
+    uint32 NextSection;
+};
+
+struct LTString {
+    short stringLength;
+    if (stringLength > 0) {
+        char Type[stringLength] <optimize=false>;
+    }    
+};
+
+struct LTTexCoord {
+    float u,v;
+};
+
+struct LTVector {
+    float x,y,z;
+};
+
+struct LTRotation {
+    float x,y,z,w;
+};
+
+struct LTMatrix {
+    LTRotation m[4];
+};
+
+struct Transform {
+    LTVector Location;
+    LTRotation Rotation;
+};
+
+// Global variable to store version
+local uint32 g_Version = 0;
+
+struct AnimTransform {
+    LTVector Location;
+    LTRotation Rotation;
+    
+    // Unknown floats only in v13
+    if(g_Version >= 13) {
+        float Unknown[2];
+    }
+};
+
+//
+// Header Data
+//
+
+struct Header {
+    uint32 Version;
+    
+    // Store version globally for other structs
+    g_Version = Version;
+    
+    uint32 KeyframeCount;
+    uint32 AnimationCount;
+    uint32 NodeCount;
+    uint32 PieceCount;
+    uint32 ChildModelCount;
+    uint32 FaceCount;
+    uint32 VertexCount;
+    uint32 WeightCount;
+    uint32 LODCount;
+    uint32 SocketCount;
+    uint32 WeightSetCount;
+    
+    // Unknown field only exists in v13
+    if(Version >= 13) {
+        uint32 Unknown;
+    }
+    
+    uint32 StringCount;
+    uint32 StringLengthTotal;
+    LTString CommandString;
+    float InternalRadius;
+    uint32 LODDistanceCount;
+    char Padding[60];
+    if(LODDistanceCount > 0) {
+        float LODDistances[LODDistanceCount] <optimize=false>;
+    }
+    
+    Printf("\n=== HEADER ===\n");
+    Printf("Version: %d\n", Version);
+    Printf("NodeCount: %d\n", NodeCount);
+    Printf("VertexCount: %d\n", VertexCount);
+    Printf("WeightCount: %d\n", WeightCount);
+};
+
+//
+// Piece Data
+//
+
+struct FaceVertex {
+    LTTexCoord TexCoord;
+    uint16 VertexIndex;
+};
+
+struct Face {
+    FaceVertex Vertices[3];
+};
+
+struct Weight {
+    uint32 NodeIndex;
+    LTVector Location;
+    float Bias;
+};
+
+local int globalVertexIndex = 0;
+local int globalPieceIndex = 0;
+
+struct Vertex {
+    uint16 WeightCount;
+    uint16 SubLODVertexIndex;
+    if(WeightCount > 0) {
+        Weight Weights[WeightCount] <optimize=false>;
+    }
+    LTVector Location;
+    LTVector Normal;
+    
+    // Print vertex data
+    Printf("\n  Vertex[%d]:\n", globalVertexIndex);
+    Printf("    Location: (%.5f, %.5f, %.5f)\n", Location.x, Location.y, Location.z);
+    Printf("    Normal:   (%.5f, %.5f, %.5f)\n", Normal.x, Normal.y, Normal.z);
+    Printf("    WeightCount: %d\n", WeightCount);
+    
+    local int w;
+    for(w = 0; w < WeightCount; w++) {
+        Printf("      Weight[%d]: Node=%d, Loc=(%.5f,%.5f,%.5f), Bias=%.5f\n",
+            w, Weights[w].NodeIndex, 
+            Weights[w].Location.x, Weights[w].Location.y, Weights[w].Location.z,
+            Weights[w].Bias);
+    }
+    
+    globalVertexIndex++;
+};
+
+struct LOD {
+    uint32 FaceCount;
+    if(FaceCount > 0) {
+        Face Faces[FaceCount] <optimize=false>;
+    }
+    uint32 VertexCount;
+
+    Printf("\n--- LOD: %d vertices ---\n", VertexCount);
+
+    if(VertexCount > 0) {
+        Vertex Vertices[VertexCount] <optimize=false>;
+    }
+};
+
+struct Piece (uint32 LODCount) {
+    uint16 MaterialIndex;
+    float SpecularPower;
+    float SpecularScale;
+    float LODWeight;
+    uint16 Unknown;
+    LTString Name;
+
+    globalPieceIndex++;
+    globalVertexIndex = 0;
+
+    if(LODCount > 0) {
+        LOD LODs[LODCount] <optimize=false>;
+    }
+};
+
+struct PieceHeader (uint32 LODCount) {
+    uint32 WeightCount;
+    uint32 PieceCount;
+
+    Printf("\n=== PIECES SECTION ===\n");
+    Printf("Total WeightCount: %d\n", WeightCount);
+    Printf("PieceCount: %d\n", PieceCount);
+
+    if(PieceCount > 0) {
+        Piece Pieces(LODCount)[PieceCount] <optimize=false>;
+    }
+};
+
+//
+// Node Data
+//
+
+local int globalNodeIndex = 0;
+
+struct Node {
+    LTString Name;
+    uint16 Index;
+    uint8 Flags;
+    LTMatrix BindMatrix;
+    uint32 ChildCount;
+    
+    Printf("\n=== NODE[%d]: %s ===\n", globalNodeIndex, Name.Type);
+    Printf("  Index: %d, Flags: %d, ChildCount: %d\n", Index, Flags, ChildCount);
+    Printf("  BindMatrix:\n");
+    Printf("    [%.5f, %.5f, %.5f, %.5f]\n", 
+        BindMatrix.m[0].x, BindMatrix.m[0].y, BindMatrix.m[0].z, BindMatrix.m[0].w);
+    Printf("    [%.5f, %.5f, %.5f, %.5f]\n", 
+        BindMatrix.m[1].x, BindMatrix.m[1].y, BindMatrix.m[1].z, BindMatrix.m[1].w);
+    Printf("    [%.5f, %.5f, %.5f, %.5f]\n", 
+        BindMatrix.m[2].x, BindMatrix.m[2].y, BindMatrix.m[2].z, BindMatrix.m[2].w);
+    Printf("    [%.5f, %.5f, %.5f, %.5f]\n", 
+        BindMatrix.m[3].x, BindMatrix.m[3].y, BindMatrix.m[3].z, BindMatrix.m[3].w);
+    
+    globalNodeIndex++;
+};
+
+//
+// Weight Data
+//
+
+struct WeightSet {
+    LTString Name;
+    uint32 NodeCount;
+    float NodeWeights[NodeCount] <optimize=false>;
+};
+
+struct WeightHeader {
+    uint32 WeightSetCount;
+    
+    // Nur erstellen wenn > 0
+    if(WeightSetCount > 0) {
+        WeightSet WeightSets[WeightSetCount] <optimize=false>;
+    }
+};
+
+//
+// Child Models
+// 
+
+local int globalChildIndex = 0;
+
+struct ChildModel (uint32 NodeCount) {
+    LTString Name;
+    uint32 BuildNumber;
+    if(NodeCount > 0) {
+        Transform Transforms[NodeCount] <optimize=false>;
+    }
+
+    Printf("\n=== CHILD MODEL[%d]", globalChildIndex);
+    if(Name.stringLength > 0) {
+        Printf(": %s", Name.Type);
+    }
+    Printf(" ===\n");
+    Printf("  BuildNumber: %d\n", BuildNumber);
+
+    local int n;
+    for(n = 0; n < NodeCount; n++) {
+        Printf("  Transform[%d]:\n", n);
+        Printf("    Loc: (%.5f, %.5f, %.5f)\n", 
+            Transforms[n].Location.x, Transforms[n].Location.y, Transforms[n].Location.z);
+        Printf("    Rot: (%.5f, %.5f, %.5f, %.5f)\n",
+            Transforms[n].Rotation.x, Transforms[n].Rotation.y, 
+            Transforms[n].Rotation.z, Transforms[n].Rotation.w);
+    }
+    
+    globalChildIndex++;
+};
+
+struct ChildModelHeader (uint32 NodeCount) {
+    uint16 ChildModelCount;
+    
+    Printf("\n=== CHILD MODELS SECTION ===\n");
+    Printf("ChildModelCount: %d\n", ChildModelCount);
+
+    if(ChildModelCount > 0) {
+        ChildModel ChildModels(NodeCount)[ChildModelCount] <optimize=false>;
+    }
+};
+
+//
+// Animation Data
+//
+
+struct AnimationHeader {
+    int AnimCount;
+    Printf("\n=== ANIMATION SECTION ===\n");
+    Printf("AnimCount: %d\n", AnimCount);
+};
+
+struct KeyFrame {
+    int Time;
+    LTString Command;
+};
+
+struct KeyFrameTransform (uint32 KeyFrameCount) {
+    // -1 marker only in v13
+    if(g_Version >= 13) {
+        int NegativeOne;
+    }
+    
+    AnimTransform Transforms[KeyFrameCount]  <optimize=false>;
+};
+
+struct Animation (int NodeCount) {
+    LTVector Extents;
+    LTString Name;
+    int UnkInt;
+    int InterpolationTime;
+    int KeyFrameCount;
+    KeyFrame KeyFrames[KeyFrameCount]  <optimize=false>;
+    KeyFrameTransform Transforms(KeyFrameCount)[NodeCount]  <optimize=false>;
+    
+    // Sicherer Print:
+    Printf("\nAnimation: ");
+    if(Name.stringLength > 0) {
+        Printf("%s", Name.Type);
+    } else {
+        Printf("(unnamed)");
+    }
+    Printf(" (Keyframes: %d)\n", KeyFrameCount);
+    Printf("  Extents: (%.5f, %.5f, %.5f)\n", Extents.x, Extents.y, Extents.z);
+    
+    // Optional: Keyframe-Commands ausgeben
+    local int kf;
+    for(kf = 0; kf < KeyFrameCount; kf++) {
+        if(KeyFrames[kf].Command.stringLength > 0) {
+            Printf("  KF[%d] @ %d: %s\n", kf, KeyFrames[kf].Time, KeyFrames[kf].Command.Type);
+        }
+    }
+};
+
+//
+// Socket Data
+//
+
+struct Socket {
+    uint32 NodeIndex;
+    LTString Name;
+    LTRotation Rotation;
+    LTVector Location;
+    
+    Printf("  Socket: %s\n", Name.Type);
+    Printf("    Location: (%.5f, %.5f, %.5f)\n", Location.x, Location.y, Location.z);
+    Printf("    Rotation: (%.5f, %.5f, %.5f, %.5f)\n", Rotation.x, Rotation.y, Rotation.z, Rotation.w);
+};
+
+struct SocketHeader {
+    uint32 SocketCount;
+    
+    Printf("\n=== SOCKETS SECTION ===\n");
+    Printf("SocketCount: %d\n", SocketCount);
+    if (SocketCount > 0) {
+        Socket Sockets[SocketCount]  <optimize=false>;
+    }    
+};
+
+//
+// AnimBinding Data
+//
+
+struct AnimBinding {
+    LTString Name;
+    LTVector Extents;
+    LTVector Origin;
+    
+    Printf("  AnimBinding: %s\n", Name.Type);
+    Printf("    Extents: (%.5f, %.5f, %.5f)\n", Extents.x, Extents.y, Extents.z);
+    Printf("    Origin:  (%.5f, %.5f, %.5f)\n", Origin.x, Origin.y, Origin.z);
+};
+
+struct AnimBindingHeader {
+    uint32 BindingCount;
+    
+    Printf("\n=== ANIM BINDINGS SECTION ===\n");
+    Printf("BindingCount: %d\n", BindingCount);
+    
+    AnimBinding AnimBindings[BindingCount] <optimize=false>;
+};
+
+//
+// GO!
+//
+
+Printf("==============================================\n");
+Printf("LTB v13 + ABC v13 DEBUG OUTPUT\n");
+Printf("==============================================\n");
+
+// 1) LTB-Wrapper vor dem ABC
+LTBPrefix   ltbPrefix;
+LTB_Header  ltbHeader;
+
+Printf("\n=== LTB HEADER ===\n");
+Printf("FileType: %d\n", ltbHeader.FileType);
+Printf("LTB Version: %d\n", ltbHeader.Version);
+Printf("MeshVersion: %d\n", ltbPrefix.MeshVersion);
+
+if (ltbHeader.FileType != 4) {
+    Printf("WARNUNG: FileType != 4 (ABC_MODEL_FILE)\n");
+}
+
+// 2) Ab hier: ABC v13
+Section section;
+Header hdr;
+
+Section pieceSection;
+PieceHeader piece(hdr.LODCount);
+
+Section nodeSection;
+Node nodes[hdr.NodeCount] <optimize=false>;
+WeightHeader weightsets;
+
+Section childSection;
+ChildModelHeader ChildModels(hdr.NodeCount);
+
+Section AnimSection;
+AnimationHeader animHdr;
+Animation anim(hdr.NodeCount)[animHdr.AnimCount] <optimize=false>;
+
+Section SocketSection;
+SocketHeader Sockets;
+
+Section AnimBindingsSection;
+AnimBindingHeader AnimBindings;
+
+Printf("\n==============================================\n");
+Printf("END OF DEBUG OUTPUT\n");
+Printf("==============================================\n");

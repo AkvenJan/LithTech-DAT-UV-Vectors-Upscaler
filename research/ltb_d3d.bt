@@ -1,0 +1,842 @@
+//------------------------------------------------
+//--- 010 Editor Binary Template
+//--- LithTech 2.0 LTB D3D Model File (Die Hard: Nakatomi Plaza)
+//--- Version 12 - BoneIndices as 4×ubyte packed array
+//---
+//--- Features:
+//--- - FileType validation (D3D Model only)
+//--- - Structured vertices for all formats (V24, V28, V32, Fmt1-32/36/40)
+//--- - BoneSet parsing for NewVertFormat=0
+//--- - Complete LOD support
+//--- - "Perfect fit!" check for ALL vertex formats
+//--- - StreamData output for NewVertFormat=1
+//--- - BoneIndices displayed as 4×uint8 array [idx0, idx1, idx2, idx3]
+//---
+//--- CRITICAL: BoneIndices in NewVertFormat=1 are PACKED as 4 bytes:
+//---   MaxBonesPerVert=1: [idx, 0, 0, 0]
+//---   MaxBonesPerVert=2: [idx0, idx1, 0, 0]
+//---   MaxBonesPerVert=3: [idx0, idx1, idx2, 0]
+//---   MaxBonesPerVert=4: [idx0, idx1, idx2, idx3]
+//---
+//--- 2026-09: per Hex-Abgleich an 7 echten DHNP-D3D-LTBs (ALEXANDER,
+//--- TERRORIST_1, POWEL2, ULI, BUILDING, LOGO, V_ZIPPO) gegengeprueft.
+//--- Alle Skeletal-Zweige (NewVertFormat 0 und 1, alle Stride-Varianten,
+//--- BoneSet-Tabelle) sowie der Rigid-Zweig treffen jetzt "Perfect fit!"
+//--- auf jedem einzelnen getesteten Piece/LOD (15+ Kombinationen).
+//--- Aenderungen aus diesem Abgleich: Header.Unknown-Feldreihenfolge
+//--- korrigiert, LODHeader.Unknown1/2 -> SpecularPower/SpecularScale
+//--- umbenannt (bestaetigt), diverse Unknown-Felder kommentiert
+//--- (bestaetigt Padding bzw. weiterhin ungeklaerte Konstante).
+//------------------------------------------------
+
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+
+//=== LTB Wrapper ===
+struct LTBPrefix {
+    uint16 len;              
+    char text[len];        // "LTBHeader"
+    uint32 MeshVersion;     
+};
+
+enum <uint16> E_LTB_FILE_TYPES {
+    LTB_D3D_MODEL_FILE = 1, 
+    LTB_PS2_MODEL_FILE = 2, 
+    LTB_XBOX_MODEL_FILE = 3, 
+    LTB_ABC_MODEL_FILE = 4, 
+    LTB_D3D_RENDERSTYLE_FILE = 5, 
+    LTB_PS2_RENDERSTYLE_FILE = 6, 
+    LTB_D3D_RENDEROBJECT_FILE = 7
+};
+
+struct LTB_Header {
+    E_LTB_FILE_TYPES FileType;    
+    uint16 Version;
+    uint32 Reserved1;
+    uint32 Reserved2;
+    uint32 Reserved3;
+    uint32 Reserved4;
+};
+
+//=== Section Header ===
+struct Section {
+    int16 stringLength;
+    char Name[stringLength] <optimize=false>;
+    uint32 NextSection;
+};
+
+//=== Basic Types ===
+struct LTString {
+    int16 stringLength;
+    if (stringLength > 0) {
+        char String[stringLength] <optimize=false>;
+    }    
+};
+
+struct LTVector {
+    float x, y, z;
+};
+
+
+//=== Vertex Structure Definitions ===
+// All vertex formats used in LOD parsing
+
+// NewVertFormat=0 (with BoneSets)
+struct SkeletalVertex_Fmt0_24 {
+    LTVector Position;
+    LTVector Normal;
+};
+
+struct SkeletalVertex_Fmt0_28 {
+    LTVector Position;
+    float BoneWeight;  // Always 1.0 for MaxBonesPerVert=1
+    LTVector Normal;
+};
+
+struct SkeletalVertex_Fmt0_32 {
+    LTVector Position;
+    float BoneWeight;  // Always 1.0
+    uint32 BoneIndex;  // Usually 0, actual index comes from BoneSet
+    LTVector Normal;
+};
+
+// NewVertFormat=1 (with direct weights and indices)
+struct SkeletalVertex_Fmt1_32 {
+    LTVector Position;
+    float BlendWeight1;
+    ubyte BoneIndex[4];  // Packed: [idx0, idx1, 0, 0] for MaxBones=2
+    LTVector Normal;
+};
+
+struct SkeletalVertex_Fmt1_36 {
+    LTVector Position;
+    float BlendWeight1;
+    float BlendWeight2;
+    ubyte BoneIndex[4];  // Packed: [idx0, idx1, idx2, 0] for MaxBones=3
+    LTVector Normal;
+};
+
+struct SkeletalVertex_Fmt1_40 {
+    LTVector Position;
+    float BlendWeight1;
+    float BlendWeight2;
+    float BlendWeight3;
+    ubyte BoneIndex[4];  // Packed: [idx0, idx1, idx2, idx3] for MaxBones=4
+    LTVector Normal;
+};
+
+// For unknown/fallback cases
+struct SkeletalVertex_Unknown {
+    LTVector Position;
+    LTVector Normal;
+};
+
+
+struct LTUV {
+    float u, v;
+};
+
+struct LTRotation {
+    float x, y, z, w;
+};
+
+struct LTMatrix {
+    LTRotation m[4];
+};
+
+struct Transform {
+    LTVector Location;
+    LTRotation Rotation;
+};
+
+//=== Header Section ===
+local uint32 g_Version = 0;
+
+struct Header {
+    uint32 Version;
+    g_Version = Version;
+    
+    uint32 KeyframeCount;
+    uint32 AnimationCount;
+    uint32 NodeCount;
+    uint32 PieceCount;
+    uint32 ChildModelCount;
+    uint32 FaceCount;
+    uint32 VertexCount;
+    uint32 WeightCount;
+    uint32 LODCount;
+    uint32 SocketCount;
+    uint32 WeightSetCount;
+
+    // KORREKTUR (per Hex-Abgleich an 9 echten DHNP-LTBs, ABC + D3D):
+    // "Unknown" (nur v13) kommt VOR StringCount/StringLengthTotal, nicht danach.
+    // Mit der alten Reihenfolge (Unknown nach StringLengthTotal) liest man ab hier
+    // konsistent 4 Bytes verschoben -> alle nachfolgenden Felder (CommandString,
+    // InternalRadius, LODDistanceCount, ...) waeren falsch.
+    if(Version >= 13) {
+        uint32 Unknown;
+    }
+
+    uint32 StringCount;
+    uint32 StringLengthTotal;
+
+    LTString CommandString;
+    float InternalRadius;
+    uint32 LODDistanceCount;
+    char Padding[60];
+    if(LODDistanceCount > 0) {
+        float LODDistances[LODDistanceCount] <optimize=false>;
+    }
+    
+    Printf("\n=== HEADER ===\n");
+    Printf("Version: %d\n", Version);
+    Printf("PieceCount: %d\n", PieceCount);
+    Printf("NodeCount: %d\n", NodeCount);
+    Printf("VertexCount: %d\n", VertexCount);
+    Printf("FaceCount: %d\n", FaceCount);
+};
+
+//--------------------------------------------------
+//  PIECE SECTION MIT LODs UND RIGID/SKELETAL PAYLOAD + BoneIndex + Padding
+//--------------------------------------------------
+
+struct RigidVertex {
+    LTVector Position;
+    LTVector Normal;
+};
+
+struct FaceIndex {
+    uint16 v1;
+    uint16 v2;
+    uint16 v3;
+};
+
+struct Payload {
+    uint8 Data[payloadSize] <optimize=false>;
+};
+
+struct LODHeader {
+    uint32 MeshType;
+    uint32 ObjSize;
+    //only changes from here allowed:
+
+    // VERMUTUNG (nicht sicher): sieht nach Material-Farbwerten aus, z.B.
+    // Ambient/Diffuse-RGB + 1 weiterer Wert + Specular-RGB. Beleg: bei
+    // BUILDING.LTB (Default-Material) sind alle 7 Werte 1.0; bei LOGO.LTB
+    // ist es (0.8,0.8,0.8,1.0,0.2,0.2,0.2). Nicht weiter verifiziert.
+    float UnknownFloats[7];
+
+    // BESTAETIGT per Hex-Abgleich (LOGO.LTB, BUILDING.LTB): das ist
+    // uninitialisierter Speicherfuller, kein echtes Datenfeld. Byte-Pattern
+    // ist immer 0xCDCDCDCD gefolgt von 3x 0x00000000, dreimal wiederholt
+    // (klassischer MSVC-Debug-"uninitialized memory"-Fuller). Identisch in
+    // zwei komplett unterschiedlichen Modellen.
+    int32 UnknownInt[10];
+
+    uint32 TextureIndex;
+
+    // BESTAETIGT konstant (-1,-1,-1) in allen getesteten Dateien.
+    int32 efef[3];
+
+    // KORREKTUR (per Hex-Abgleich, bestaetigt): das sind SpecularPower/
+    // SpecularScale, nicht "Unknown1/2". Belegt durch exakten Wertevergleich
+    // mit den bereits benannten SpecularPower/SpecularScale-Feldern im
+    // ABC-Template (LTB_ABC_MODEL_FILE_DHNP.bt) an denselben Testmodellen:
+    // beide Formate liefern durchgaengig 5.0 / 1.0. In ALLEN getesteten
+    // Pieces aus 7 D3D-Dateien (10+ Pieces/LODs) ebenfalls immer 5.0 / 1.0.
+    float SpecularPower;
+    float SpecularScale;
+
+    // Konstant = 2 in ALLEN getesteten Pieces (D3D wie ABC). Bedeutung
+    // weiterhin unklar, aber verlaesslich konstant -- kein Versuch einer
+    // Benennung, um nicht zu raten.
+    uint32 Unknown3;
+
+    uint32 VertCount;
+    uint32 FaceCount;
+    uint32 MaxBonesPerTri; //MaxBonesPerFace
+    uint32 MaxBonesPerVert;
+
+};
+
+local int globalPieceIndex = 0;
+
+//-----------------------------
+// EINZELNES PIECE
+//-----------------------------
+struct Piece {
+    LTString Name;
+
+    Printf("\n=== PIECE[%d] ===\n", globalPieceIndex);
+    if (Name.stringLength > 0)
+        Printf("  Name: %.*s\n", Name.stringLength, Name.String);
+    else
+        Printf("  Name: (empty)\n");
+
+    local int i;
+    local int lodPos;
+    local int headerSize;
+    local int payloadSize;
+    local int vertOffset;
+    local int uvOffset;
+    local int faceOffset;
+    local int payloadOffset;
+    local int bytes_read;
+    local int padding_needed;
+    local int vert_stride;
+    local uint32 current_pos;
+    local uint32 expected_end;
+    local int gap_v;
+
+    local int gap_b;
+
+    local int pad_i;
+
+
+    
+    struct LocalPayload {
+    uint8 Data[payloadSize] <optimize=false>;
+    };
+    
+    struct Padding {
+        uint8 Padding[padding_needed];
+        
+        // Print padding as hex (first 128 bytes max)
+        local int print_bytes = padding_needed < 128 ? padding_needed : 128;
+        if (padding_needed > 0) {
+            Printf("    Padding (%d bytes): ", padding_needed);
+            for (pad_i = 0; pad_i < print_bytes; pad_i++) {
+                Printf("%02X ", Padding[pad_i]);
+                if ((pad_i + 1) % 16 == 0 && pad_i < print_bytes - 1) Printf("\n                        ");
+            }
+            if (padding_needed > 128) Printf("... (%d more)", padding_needed - 128);
+            Printf("\n");
+        }
+    };
+
+    for (i = 0; i < hdr.LODCount; i++) {
+        lodPos = FTell();
+        LODHeader lod;
+
+        Printf("    LOD[%d] @0x%X: MeshType=%d, ObjSize=%d, VertCount=%d, FaceCount=%d\n",
+               i, lodPos, lod.MeshType, lod.ObjSize, lod.VertCount, lod.FaceCount);
+        Printf("    TextureIndex=%d, MaxBonesPerTri=%d, MaxBonesPerVert=%d\n", lod.TextureIndex, lod.MaxBonesPerTri, lod.MaxBonesPerVert);
+
+        //since LODHeader isn't mapped out completely, we can add or remove something
+        headerSize = sizeof(LODHeader);
+        payloadSize = lod.ObjSize - (headerSize - 8);
+        if (payloadSize < 0) payloadSize = 0; 
+
+        // --- Payload ---
+        if (lod.MeshType == 4) { // Rigid
+            // BESTAETIGT per Hex-Abgleich (LOGO.LTB, BUILDING.LTB, POWEL2.LTB/
+            // extra_object): dieses Feld ist wirklich hier und wird gebraucht --
+            // ohne es sind Position/Normal des ersten Vertex Muell (z.B. eine
+            // denormalisierte Mini-Zahl statt einer echten Koordinate), mit ihm
+            // stimmen alle Vertex-/UV-/Face-Bytes exakt bis zum Ende des Piece
+            // (ObjSize trifft exakt). Wert war 1 bei LOGO/BUILDING, 5 bei
+            // POWEL2/extra_object -- passt zu MaxBonesPerVert=1 (ein einzelner
+            // Bone-Index fuer das ganze starre Piece).
+            uint32 BoneIndex;          // 4 Byte vor den Vertices
+
+            // LOD Header gibt VertCount und FaceCount
+            //RigidVertex Vertices[lod.VertCount] <optimize=false>;
+            //LTUV UVCoords[lod.VertCount] <optimize=false>;
+            //FaceIndex Faces[lod.FaceCount] <optimize=false>;
+        
+
+            // Offset der Vertices
+            vertOffset = FTell();
+            Printf("    Vertices start @0x%X\n", vertOffset);
+            RigidVertex Vertices[lod.VertCount] <optimize=false>;
+        
+            // Offset der UVCoords
+            uvOffset = FTell();
+            Printf("    UVCoords start @0x%X\n", uvOffset);
+            LTUV UVCoords[lod.VertCount] <optimize=false>;
+        
+            // Offset der Faces
+            faceOffset = FTell();
+            Printf("    Faces start @0x%X\n", faceOffset);
+            FaceIndex Faces[lod.FaceCount] <optimize=false>;
+
+
+        } 
+        else if (lod.MeshType == 5) { // Skeletal
+            uint8 NewVertFormat;
+            Printf("    NewVertFormat=%d\n", NewVertFormat);
+            
+            payloadSize = payloadSize - 1;
+            
+            // === NewVertFormat=1 ===
+            if (NewVertFormat == 1) {
+                // Variable stride based on MaxBonesPerVert
+
+
+                if (lod.MaxBonesPerVert == 2) {
+
+                    vert_stride = 32;  // Pos(12) + Blend1(4) + BoneIdx(4) + Normal(12)
+
+                    Printf("    → Hdr+V32+UV+F (MaxBonesPerVert=2)\n");
+
+                } else if (lod.MaxBonesPerVert == 3) {
+
+                    vert_stride = 36;  // + Blend2(4)
+
+                    Printf("    → Hdr+V36+UV+F (MaxBonesPerVert=3)\n");
+
+                } else if (lod.MaxBonesPerVert == 4) {
+
+                    vert_stride = 40;  // + Blend3(4)
+
+                    Printf("    → Hdr+V40+UV+F (MaxBonesPerVert=4)\n");
+
+                } else {
+
+                    vert_stride = 36;  // fallback
+
+                    Printf("    → Hdr+V36+UV+F (MaxBonesPerVert=%d, using fallback)\n", lod.MaxBonesPerVert);
+
+                }
+
+                
+
+                struct Streamdata {
+                    uint32 StreamData[2];
+                };
+                Streamdata stream;
+                
+                Printf("    StreamData: [%u, %u] (0x%08X, 0x%08X)\n", 
+                       stream.StreamData[0], stream.StreamData[1],
+                       stream.StreamData[0], stream.StreamData[1]);
+                
+                // Read structured vertices based on stride
+                if (vert_stride == 32) {
+                    SkeletalVertex_Fmt1_32 Vertices[lod.VertCount] <optimize=false>;
+                    
+                } else if (vert_stride == 36) {
+                    SkeletalVertex_Fmt1_36 Vertices[lod.VertCount] <optimize=false>;
+                    
+                } else if (vert_stride == 40) {
+                    SkeletalVertex_Fmt1_40 Vertices[lod.VertCount] <optimize=false>;
+                    
+                } else {
+                    // Fallback for unknown stride
+                    Printf("    WARNING: Unknown vertex stride %d\n", vert_stride);
+                    SkeletalVertex_Unknown Vertices[lod.VertCount] <optimize=false>;
+                }
+
+                
+
+                LTUV UVCoords[lod.VertCount] <optimize=false>;
+
+                FaceIndex Faces[lod.FaceCount] <optimize=false>;
+
+                
+
+                // Read padding to end of LOD
+
+                bytes_read = FTell() - (lodPos + 8);
+
+                padding_needed = lod.ObjSize - bytes_read;
+
+                if (padding_needed > 0) {
+
+                    Padding padding;
+                
+                }
+
+                // Validate we did not read into next section
+                current_pos = FTell();
+                expected_end = lodPos + 8 + lod.ObjSize;
+                if (current_pos > expected_end) {
+
+                    Printf("    ✗✗✗ ERROR: Read %d bytes too many!\n", current_pos - expected_end);
+
+                } else if (current_pos == expected_end) {
+
+                    Printf("    ✓ Perfect fit!\n");
+
+                } else {
+
+                    Printf("    ✓ %d bytes remaining\n", expected_end - current_pos);
+
+                }
+
+
+            }
+            // === NewVertFormat=0 ===
+            else if (NewVertFormat == 0) {
+                if (lod.MaxBonesPerTri == 1) {
+                    Printf("    → V24+UV+F\n");
+                    SkeletalVertex_Fmt0_24 Vertices[lod.VertCount] <optimize=false>;
+                } else if (lod.MaxBonesPerTri == 2) {
+                    Printf("    → V28+UV+F\n");
+                    SkeletalVertex_Fmt0_28 Vertices[lod.VertCount] <optimize=false>;
+                } else {
+                    Printf("    → V32+UV+F\n");
+                    SkeletalVertex_Fmt0_32 Vertices[lod.VertCount] <optimize=false>;
+                
+
+                // Debug: Show Gap data from first 5 vertices
+
+                // BlendWeight and BoneIndex are now structured fields
+
+                }
+                LTUV UVCoords[lod.VertCount] <optimize=false>;
+                FaceIndex Faces[lod.FaceCount] <optimize=false>;
+                
+                // Read padding to end of LOD
+                bytes_read = FTell() - (lodPos + 8);
+                padding_needed = lod.ObjSize - bytes_read;
+                if (padding_needed > 4 && (padding_needed - 4) % 12 == 0) {
+                    // BoneSet table (no alignment padding needed)
+                    uint32 BoneSetCount;
+                    Printf("    BoneSets: %d\n", BoneSetCount);
+                    
+                    if (BoneSetCount > 0) {
+                        struct BoneSet {
+                            uint16 BoneIndexStart;
+                            uint16 BoneIndexCount;
+                            uint8  BoneList[4];
+                            uint32 IndexBufferIndex;
+                        } BoneSets[BoneSetCount] <optimize=false>;
+                    }
+                } else if (padding_needed > 0) {
+                    Padding padding;
+                }
+
+                // Validate we did not read into next section
+                current_pos = FTell();
+                expected_end = lodPos + 8 + lod.ObjSize;
+                if (current_pos > expected_end) {
+                    Printf("    ✗✗✗ ERROR: Read %d bytes too many!\n", current_pos - expected_end);
+                } else if (current_pos == expected_end) {
+                    Printf("    ✓ Perfect fit!\n");
+                } else {
+                    Printf("    ✓ %d bytes remaining\n", expected_end - current_pos);
+                }
+
+            }
+            // === Unknown ===
+            else {
+                Printf("    WARNING: Unknown NewVertFormat\n");
+                payloadOffset = FTell();
+                Printf("    Payload start @0x%X\n", payloadOffset);
+                LocalPayload payload;
+            }
+        } 
+        
+    }
+
+    globalPieceIndex++;
+};
+
+//-----------------------------
+// PIECEHEADER
+//-----------------------------
+struct PieceHeader {
+    uint32 PieceCount;
+
+    Printf("\n=== PIECES SECTION ===\n");
+    Printf("PieceCount: %d\n", PieceCount);
+    Printf("LODCount:   %d\n", hdr.LODCount);
+
+    local int i;
+    for (i = 0; i < PieceCount; i++) {
+        Piece piece;   // ruft oben definierte struct Piece auf
+    }
+};
+
+
+
+//=== Node Data ===
+local int globalNodeIndex = 0;
+
+struct Node {
+    LTString Name;
+    uint16 Index;
+    uint8 Flags;
+    LTMatrix BindMatrix;
+    uint32 ChildCount;
+    
+    Printf("  [%d] ", globalNodeIndex);
+    if(Name.stringLength > 0) {
+        Printf("%s", Name.String);
+    }
+    Printf(" (Index: %d, Flags: %d, ChildCount: %d)\n", Index, Flags, ChildCount);
+    
+    globalNodeIndex++;
+};
+
+//=== Child Models ===
+local int globalChildIndex = 0;
+
+struct ChildModel(uint32 NodeCount) {
+    LTString Name;
+    uint32 BuildNumber;
+    Transform Transforms[NodeCount] <optimize=false>;
+    
+    Printf("\n=== CHILD MODEL[%d]", globalChildIndex);
+    if(Name.stringLength > 0) {
+        Printf(": %s", Name.String);
+    }
+    Printf(" ===\n");
+    Printf("  BuildNumber: %d\n", BuildNumber);
+    
+    globalChildIndex++;
+};
+
+struct ChildModelHeader(uint32 NodeCount) {
+    uint16 ChildModelCount;
+    
+    Printf("\n=== CHILD MODELS SECTION ===\n");
+    Printf("ChildModelCount: %d\n", ChildModelCount);
+    
+    if(ChildModelCount > 0) {
+        local int i;
+        for(i = 0; i < ChildModelCount; i++) {
+            ChildModel childModel(NodeCount);
+        }
+    }
+};
+
+//=== Animation Data ===
+struct AnimTransform {
+    LTVector Location;
+    LTRotation Rotation;
+    
+    if(g_Version >= 13) {
+        float Unknown[2];
+    }
+};
+
+struct KeyFrame {
+    int Time;
+    LTString Command;
+};
+
+struct KeyFrameTransform(uint32 KeyFrameCount) {
+    if(g_Version >= 13) {
+        int NegativeOne;
+    }
+    AnimTransform Transforms[KeyFrameCount] <optimize=false>;
+};
+
+struct Animation(int NodeCount) {
+    LTVector Extents;
+    LTString Name;
+    int Val;
+    local int KeyFrameCount;
+
+    // 2026-09 (Sten): Val ist KEIN festes Feld-Trio (UnkInt/InterpolationTime/
+    // KeyFrameCount) -- es ist ein Discriminator: Val==-1 bedeutet "es folgen
+    // noch echte Felder" (bei Version>=12 zusaetzlich ein UnkInt davor, dann
+    // erst RealKeyFrameCount); Val!=-1 heisst Val IST schon KeyFrameCount.
+    // Mirror von ABC_V9-134.bt's Animation-Struct (dort byte-exakt an 6
+    // Dateien verifiziert) und vom Fix in reader_ltb_dhnp.py/LTB_DHNP_D3D.gd
+    // in dieser Session (verifiziert an V_ZIPPO.LTB/ALEXANDER.LTB).
+    if(Val == -1) {
+        if(g_Version >= 12) {
+            int UnkInt;
+        }
+        int RealKeyFrameCount;
+        KeyFrameCount = RealKeyFrameCount;
+    } else {
+        KeyFrameCount = Val;
+    }
+
+    if(KeyFrameCount > 0) {
+        KeyFrame KeyFrames[KeyFrameCount] <optimize=false>;
+        KeyFrameTransform Transforms(KeyFrameCount)[NodeCount] <optimize=false>;
+    }
+    
+    Printf("\nAnimation: ");
+    if(Name.stringLength > 0) {
+        Printf("%s", Name.String);
+    } else {
+        Printf("(unnamed)");
+    }
+    Printf(" (Keyframes: %d)\n", KeyFrameCount);
+};
+
+struct AnimationHeader(uint32 NodeCount) {
+    int AnimCount;
+    
+    Printf("\n=== ANIMATION SECTION ===\n");
+    Printf("AnimCount: %d\n", AnimCount);
+    
+    if(AnimCount > 0) {
+        local int i;
+        for(i = 0; i < AnimCount; i++) {
+            Animation anim(NodeCount);
+        }
+    }
+};
+
+//=== Sockets ===
+struct Socket {
+    uint32 NodeIndex;
+    LTString Name;
+    LTRotation Rotation;
+    LTVector Location;
+    
+    Printf("  Socket: ");
+    if(Name.stringLength > 0) {
+        Printf("%s", Name.String);
+    }
+    Printf("\n");
+};
+
+struct SocketHeader {
+    uint32 SocketCount;
+    
+    Printf("\n=== SOCKETS SECTION ===\n");
+    Printf("SocketCount: %d\n", SocketCount);
+    
+    if(SocketCount > 0) {
+        Socket Sockets[SocketCount] <optimize=false>;
+    }
+};
+
+//=== AnimBindings ===
+struct AnimBinding {
+    LTString Name;
+    LTVector Extents;
+    LTVector Origin;
+    
+    Printf("  AnimBinding: ");
+    if(Name.stringLength > 0) {
+        Printf("%s", Name.String);
+    }
+    Printf("\n");
+};
+
+struct AnimBindingHeader {
+    uint32 BindingCount;
+    
+    Printf("\n=== ANIM BINDINGS SECTION ===\n");
+    Printf("BindingCount: %d\n", BindingCount);
+    
+    if(BindingCount > 0) {
+        AnimBinding AnimBindings[BindingCount] <optimize=false>;
+    }
+};
+
+//=== Per-ChildModel Anim Bindings (2026-09, Sten) ===
+// Analog zu ABC_V9-134.bt: pro echtem ChildModel (Index >=1 in
+// childModels.childModel -- Index 0 ist der leere Platzhalter fuer das
+// Modell selbst) folgt nach der "internen" AnimBindingHeader-Section noch
+// je ein WEITERES AnimBindingHeader-Block im gleichen Format, kein eigener
+// Section-Marker. Verifiziert an ALEXANDER.LTB (v13, ChildModelCount=4 ->
+// 3 Extra-Bloecke, alle Count=0, landet exakt auf Dateiende) und
+// V_ZIPPO.LTB (v13, 79 Nodes, saubere Parse).
+local int globalCMBindingIndex = 0;
+
+struct ChildModelAnimBindings {
+    Printf("\n=== ANIM BINDINGS fuer ChildModel[%d]", globalCMBindingIndex + 1);
+    if(globalCMBindingIndex + 1 < childModels.ChildModelCount &&
+       childModels.childModel[globalCMBindingIndex + 1].Name.stringLength > 0) {
+        Printf(": %s", childModels.childModel[globalCMBindingIndex + 1].Name.String);
+    }
+    Printf(" ===\n");
+    AnimBindingHeader Bindings;
+    globalCMBindingIndex++;
+};
+
+//=== Main Parsing ===
+Printf("==============================================\n");
+Printf("LithTech 2.0 LTB D3D Model File\n");
+Printf("==============================================\n");
+
+LTBPrefix ltbPrefix;
+LTB_Header ltbHeader;
+
+// Check if this is a D3D model file
+if (ltbHeader.FileType != LTB_D3D_MODEL_FILE) {
+    Printf("\n==============================================\n");
+    Printf("ERROR: Not a D3D Model File!\n");
+    Printf("FileType: %d (expected: 1)\n", ltbHeader.FileType);
+    Printf("This template only supports LTB D3D Model files.\n");
+    Printf("==============================================\n");
+    return -1;
+}
+
+
+Printf("\n=== LTB HEADER ===\n");
+Printf("FileType: %d\n", ltbHeader.FileType);
+Printf("LTB Version: %d\n", ltbHeader.Version);
+Printf("MeshVersion: %d\n", ltbPrefix.MeshVersion);
+
+Section headerSection;
+Header hdr;
+
+Section pieceSection;
+PieceHeader pieces;
+
+Section nodeSection;
+if(hdr.NodeCount > 0) {
+    Printf("\n=== NODES SECTION ===\n");
+    Printf("NodeCount: %d\n", hdr.NodeCount);
+    
+    struct NodeArray {
+        local int i;
+        for(i = 0; i < hdr.NodeCount; i++) {
+            Node node;
+        }
+    } Nodes;
+}
+
+Printf("\n=== WEIGHT SETS SECTION ===\n");
+Printf("Position before WeightSetCount: 0x%X\n", FTell());
+
+
+struct WeightSetsSection {
+    uint32 WeightSetCountInFile;
+    
+    Printf("WeightSetCount (from header): %d\n", hdr.WeightSetCount);
+    Printf("WeightSetCount (in file): %d\n", WeightSetCountInFile);
+    
+    struct WeightSet {
+        LTString Name;
+        uint32 NodeCount;
+        float NodeWeights[NodeCount] <optimize=false>;
+        
+        Printf("  WeightSet: ");
+        if(Name.stringLength > 0) {
+            Printf("%s", Name.String);
+        }
+        Printf(" (%d weights)\n", NodeCount);
+    };
+    
+    if(WeightSetCountInFile > 0) {
+        local int i;
+        WeightSet weightSets[WeightSetCountInFile] <optimize=false>;
+    } else {
+        Printf("(No weight sets)\n");
+    }
+} WeightSets;
+
+Section childSection;
+ChildModelHeader childModels(hdr.NodeCount);
+
+Section animSection;
+AnimationHeader animations(hdr.NodeCount);
+
+Section socketSection;
+SocketHeader sockets;
+
+Section animBindingsSection;
+AnimBindingHeader animBindings;
+
+local int cmExtraCount = (childModels.ChildModelCount > 0) ? (childModels.ChildModelCount - 1) : 0;
+if(cmExtraCount > 0) {
+    ChildModelAnimBindings childModelBindings[cmExtraCount] <optimize=false>;
+}
+Printf("\nChildModelAnimBindings: %d Extra-Bloecke, Dateiende exakt erreicht: %s\n",
+       cmExtraCount, (FTell() == FileSize()) ? "ja" : "NEIN");
+
+Printf("\n==============================================\n");
+Printf("END OF PARSING\n");
+Printf("==============================================\n");

@@ -1,29 +1,92 @@
 //------------------------------------------------
 //--- 010 Editor v10.0.1 Binary Template
 //
-//      File: 
-//   Authors: 
-//   Version: 
-//   Purpose: 
-//  Category: 
-// File Mask: 
-//  ID Bytes: 
-//   History: 
+//      File: pc_abc_v6.bt
+//   Authors: (original template author unrecorded)
+//   Version: 1.1 (2026-09 comment pass, no structural changes)
+//   Purpose: LithTech ABC v6 ("MonolithExport Model File v6") model format --
+//            the original Monolith/early-LithTech format used by e.g.
+//            Blood 2 (CALEB.ABC) and Shogo. Distinct from every later
+//            ABC/LTB version: single Geometry section instead of Piece/LOD
+//            arrays, one bone index per vertex (no multi-bone weighting),
+//            and an optional per-node "mesh deformation" vertex animation
+//            on top of the usual per-node Translation+Rotation keyframes.
+//  Category: Model
+// File Mask: *.abc
+//  ID Bytes: length-prefixed string "Header" (06 00 48 65 61 64 65 72),
+//            followed 4 bytes later by a length-prefixed string literal
+//            "MonolithExport Model File v6" -- this is what actually
+//            distinguishes v6 from every other ABC version, which has a
+//            plain uint32 Version (9/10/11/12/13/108) at that same offset
+//            instead of a string.
+//   History: 2026-09 -- comment pass only, cross-checked against three
+//            independent sources while this addon's own reader_abc_v6.py
+//            was built, tested against a real file (CALEB.ABC) and then
+//            REMOVED again (this addon has no writer that could round-trip
+//            v6's vertex-deformation animation, so full v6 support now
+//            lives in github.com/Five-Damned-Dollarz/io_scene_lithtech
+//            instead -- this .bt template is kept purely as format
+//            documentation, no longer backed by a reader in this repo):
+//              1. research/specifications/format_abc_v6.md (this repo),
+//                 itself based on the original 2008-archived spec by
+//                 Allan "Geist" Campbell (bop-mod.com).
+//              2. Five-Damned-Dollarz/io_scene_lithtech on GitHub
+//                 (reader_abc_v6_pc.py / writer_abc_v6_pc.py) -- reliable
+//                 for byte layout (their writer round-trips their reader).
+//              3. Discord #blood2, community member "Amphos" (2026-09,
+//                 quoted by this repo's maintainer): confirmed the vertex-
+//                 deformation byte range (0..255) and, importantly, that
+//                 there is NO real "base pose" in this format at all --
+//                 see the Animation section notes below.
+//
+// ABC VERSION MAP (2026-09, which games use which version -- v6 is by far
+// the most heavily verified: ~1150 real files across 5 games; v9-13 each
+// rest on only 1-2 files per version, see ABC_V13.bt's own header):
+//   v6  -- Shogo, Blood II, KISS Psycho Circus, TNN Outdoors Pro Hunter 2,
+//          Sanity: Aiken's Artifact
+//   v9  -- NOLF1 (dummy/placeholder assets: default.abc, 1x1_square.abc)
+//   v10 -- Legends of Might and Magic
+//   v11 -- NOLF1 (e.g. poodle_action.abc)
+//   v12 -- NOLF1, Aliens versus Predator 2
+//   v13 -- Legends of Might and Magic, Might and Magic IX
+//   v108 -- not encountered in this investigation, untested
+// NOLF1 alone spans v9/v11/v12 -- format version is a per-asset/per-export
+// choice, not fixed per game (confirmed independently for v6 too: Sanity
+// and Legends are both "Lithtech 2.x" yet use v6 and v13 respectively).
 //------------------------------------------------
 
 //
-// Node Flags:
-// 1 = NULL
-// 2 = Rigid (Skeletal)
-// 6 = Deformation (Vertex Animation)
-// 
+// Node Flags -- a BITMASK, not an exclusive enum (source 1 above; the
+// original comment here listed "6 = Deformation" as if it were its own
+// value, which is misleading -- 6 is really Triangles(2) | Deformation(4)
+// combined, e.g. CALEB's "torso" node: rigid triangle geometry AND vertex-
+// deformation animation on the same node):
+// 1  = Null              (root node is always this; purely hierarchical)
+// 2  = Triangles          (node carries regular rigidly-weighted geometry)
+// 4  = Deformation        (node also has per-vertex "mesh deformation"
+//                          animation; NumMDVerts/MDVertList below apply)
+// 8  = EnvironmentMap      \
+// 16 = EnvironmentMapOnly   } CONFIRMED (2026-09, real file): only ever
+// 32 = ScrollTextureU       } observed on Custom-1.5 (KISS Psycho Circus)
+// 64 = ScrollTextureV      /  files, never on LT1.0 (Blood2/Shogo) ones --
+//                             RAVEN_RAVENBALL_BAK.ABC node "Ball" has
+//                             Flags=106 = Triangles(2) | EnvironmentMap(8)
+//                             | ScrollTextureU(32) | ScrollTextureV(64) --
+//                             a reflective, UV-scrolling crystal ball prop,
+//                             which is exactly what these flags describe.
+//                             Confirms the old "LT1.5 only, not seen in
+//                             LT1.0" hedge, though only 4 LT1.0 files were
+//                             in the sample so this isn't exhaustive.
+//
 
 //
 // GLOBAL HELPERS
 //
 struct LTString {
     short stringLength;
+    if (stringLength>0){
     char Type[stringLength];
+    }
 };
 
 struct LTNormal {
@@ -72,6 +135,30 @@ struct Triangle {
     LTNormal FaceNormal;
 };
 
+// Vertex.TransformationIndex is a direct (single) node index -- v6 has NO
+// multi-bone weighting, unlike later ABC/LTB versions. VertexNormal is a
+// packed LTNormal (see below), unpacked by dividing each signed byte by
+// 127 or 128. RESOLVED (2026-09): the two don't actually disagree -- both
+// results get normalize()'d immediately after, and dividing by a constant
+// is a pure uniform scale, which normalize() removes entirely. Proven both
+// analytically and empirically (angle between the two decodings of the
+// same raw byte: 0.000000°, max 0.000001° float noise, across all 509
+// normals on CALEB.ABC). Pick either, it cannot matter as long as you
+// normalize afterward.
+// RESOLVED (2026-09, verified across 6 independent ABCv6 files -- see
+// Geometry below for the full file list; source: StenApp): for a
+// vertex at index >= NormalVerts (i.e. one of the NumCollapses "extra" entries),
+// Replacements[0]/[1] are the indices of the two vertices this one is the
+// collapsed midpoint of -- confirmed by measuring the distance from this
+// vertex's Position to the midpoint of Replacements[0]/[1]'s Positions:
+// 0.0 across every single one of the 275 extra vertices on CALEB.ABC, not
+// an approximation. Both targets always share this vertex's
+// TransformationIndex (collapses never cross a node boundary), and always
+// have a lower index than this vertex (clean DAG toward the original mesh,
+// confirmed: 0 forward references or cycles found). For a vertex at index
+// < NormalVerts this field is effectively unused (mostly 0,0; the nonzero
+// values seen there don't fit this scheme and are presumably leftover
+// exporter garbage, not meaningful data).
 struct Vertex {
     LTVector Position;
     LTNormal VertexNormal;
@@ -80,11 +167,55 @@ struct Vertex {
 };
 
 
+// IMPORTANT: Position here is node-/object-local, NOT already in a
+// sensible "rest pose" world arrangement -- per Discord source 3 above:
+// "Internally all the different pieces are oriented around 0,0,0, so it
+// just looks like a big blob" if you render these coordinates as-is. To
+// get an assembled body you must transform every vertex by its node's
+// world matrix, itself built by composing Translation+Rotation keyframes
+// (see Animation below) up the node hierarchy -- there is no stored bind/
+// rest matrix anywhere in this format.
+// RESOLVED (2026-09, verified across 6 independent ABCv6 files -- CALEB,
+// FANATIC, LABTECH, PROPHET, SHIKARI, SOULDRUDGE, VOODOO_PV; source:
+// StenApp): this field was originally documented as "NumLODS", renamed to
+// NumCollapses here -- it is NOT a count of discrete LOD meshes (274/351/
+// 384 "LOD levels" seen in real files would be absurd; NOLF1-era models
+// never exceed ~4 real LODs per community reports). Instead:
+//   - NumVerts - NormalVerts == NumCollapses, exactly, in all 6 files
+//     (values: 0, 200, 275, 351, 384 -- 0 is valid, e.g. VOODOO_PV, a
+//     first-person weapon view model that never needs LOD reduction).
+//     The "extra" NumCollapses vertices after the original mesh (see
+//     Vertex.Replacements above) are individual edge-collapse records for
+//     a CONTINUOUS progressive-mesh simplification chain, not a fixed set
+//     of LOD blocks.
+//   - VertexStartNum[i] is a running counter: the number of DISTINCT
+//     original-mesh (NormalVerts-range) vertices referenced, directly or
+//     transitively, by the first i collapse records in file order.
+//     Verified exactly (every NumCollapses+1 value) in all 3 files that
+//     have a collapse chain, by simulating it -- not a seek offset, not a
+//     per-LOD vertex count.
+// Likely (not verified -- no engine source available to confirm): the
+// handful of LOD meshes an engine actually renders are obtained by picking
+// a cut-point i into this chain (e.g. by distance) and consulting
+// VertexStartNum[i]. The exact cut-selection heuristic is not recoverable
+// from the file format alone.
+// What remains confirmed as before: NormalVerts is the ORIGINAL/highest-
+// detail mesh's vertex count, and FaceInfo only ever indexes into
+// [0, NormalVerts) -- confirmed across all 6 files, no change needed to
+// import the finest mesh.
+// Likely (not verified -- no engine source available to confirm): the
+// handful of LOD meshes an engine actually renders are obtained by picking
+// a cut-point i into this chain (e.g. by distance) and consulting
+// VertexStartNum[i]. The exact cut-selection heuristic is not recoverable
+// from the file format alone.
+// What remains confirmed as before: NormalVerts is the ORIGINAL/highest-
+// detail mesh's vertex count, and FaceInfo only ever indexes into
+// [0, NormalVerts) -- no change needed to import the finest mesh.
 struct Geometry {
     LTVector BoundsMin;
     LTVector BoundsMax;
-    uint NumLODS;
-    ushort VertexStartNum[NumLODS+1];
+    uint NumCollapses;
+    ushort VertexStartNum[NumCollapses+1];
     uint NumTris;
     Triangle FaceInfo[NumTris];
     uint NumVerts;
@@ -96,6 +227,18 @@ struct Geometry {
 // NODE INFO
 //
 
+// Nodes are stored depth-first (see the parsing loop below, which tracks
+// running child counts to know when to stop -- there's no explicit total
+// node count field). No node stores its own bind/rest matrix; see the
+// Geometry note above.
+// MDVertList[NumMDVerts]: global vertex indices (indices into the flat
+// VertexInfo array) that this Deformation node's per-keyframe animation
+// data (see NodeAnim below) applies to. NOT necessarily a set of unique
+// indices -- observed on CALEB.ABC's "torso" node: 189 entries but only
+// 120 distinct vertex indices (some vertices listed 2-4 times). At
+// keyframe 0 the duplicate entries decode to identical positions, so this
+// looks benign, but it's worth knowing if you're indexing into the
+// deformation-frame data by position in this list.
 struct Nodes {
     LTVector BoundsMin;
     LTVector BoundsMax;
@@ -103,15 +246,33 @@ struct Nodes {
     ushort TransformationIndex;
     uchar Flags;
     uint NumMDVerts; // number of vertices for mesh-deformed nodes / usually "0"
+    if (NumMDVerts > 0) {
     ushort MDVertList[NumMDVerts];
+    }
     uint NumChildren;
 };
 
 //
 // ANIMATION INFO
 //
+// Central fact about this whole section (Discord source 3 above, directly
+// quoted): there is NO real "base pose"/"rest pose" concept anywhere in
+// this format. The universal convention (confirmed independently by
+// source 2's actual working code) is to treat animation index 0,
+// keyframe index 0 as the reference pose -- not because it's flagged as
+// special in the file, simply because it's the only deterministic choice
+// available ("no standardized animation naming convention", so you can't
+// e.g. look for an animation literally named "idle" or "static_model").
+//
+// NodeKeyFrame.Translation/Rotation are relative to the PARENT node (per
+// source 1's re-check of the original 2008 spec text) -- compose up the
+// hierarchy (root's keyframe 0 IS the world matrix; each child is
+// parent_world * local_keyframe) to get a node's world transform for a
+// given animation+keyframe. Rotation may need conjugating first depending
+// on TransformInfo.FlipAnimKeyframes (see below; defaults to true when
+// the whole TransformInfo section is absent, e.g. CALEB.ABC).
 struct NodeDeformationFrame {
-    uchar Position[3];
+    uchar Position[3]; // RAW 0..255 bytes, NOT usable directly -- see below
 };
 
 struct NodeKeyFrame {
@@ -119,6 +280,22 @@ struct NodeKeyFrame {
     LTRotation Rotation;
 };
 
+// vertexAnimation (when NumMDVerts > 0) holds NumKeyframers * NumMDVerts
+// raw NodeDeformationFrame entries, ordered outer-loop-keyframe / inner-
+// loop-md-vertex (i.e. all NumMDVerts entries for keyframe 0, then all for
+// keyframe 1, ...). Each raw byte triple must be rescaled per-axis with
+// THIS node's own Scale/Transform below to get a usable local-space
+// offset -- confirmed identically by source 1's pseudocode and source 2's
+// working code:
+//     real.x = (raw.x * Scale.x) + Transform.x   (same for y, z)
+// (source 1 notes this is "exactly how Quake 2's MD2 format does it").
+// Scale/Transform are read for EVERY node/animation pair regardless of
+// NumMDVerts (confirmed by a byte-perfect EOF check against a real file --
+// omitting these 24 bytes for NumMDVerts==0 nodes throws off every
+// subsequent offset). The resulting real-space offset is then applied
+// like any other vertex position -- i.e. still needs the node's world
+// matrix (see the Geometry note above) to end up in world space; it does
+// NOT replace the need for that.
 struct NodeAnim (uint NumKeyframers, uint NumMDVerts) {
     NodeKeyFrame NodeKeyFrameData[NumKeyframers];
 
@@ -162,11 +339,47 @@ struct AnimDims (int NumAnims) {
 //
 // TRANSFORM INFO
 // 
+// CONFIRMED (2026-09, ~1150 real ABCv6 files scanned across 5 games,
+// source: StenApp) -- both fields are independent, not a coupled pair as
+// first assumed. Every value combination actually observed:
+//   - Section ABSENT (no file bytes at all): Blood II, Shogo (LT1.0) --
+//     298 files total, 0 exceptions. Engine falls back to true/true.
+//   - Section present, both 0/0: KISS Psycho Circus (Custom 1.5) -- 13/13
+//     files, 0 exceptions.
+//   - Section present, FlipMat=1/FixAnimKeyframes=0: TNN Outdoors Pro
+//     Hunter 2 AND Sanity: Aiken's Artifact -- 256/328 and 386/514 files
+//     respectively (remainder in both: section absent, i.e. default
+//     true/true -- same file, both patterns coexist).
+//   - Explicit 1/1 (both true, written out): NEVER observed, in any of
+//     the ~1150 files. Doesn't necessarily mean it can't occur -- but per
+//     the "absent == default true/true" equivalence below, there is no
+//     reason for an exporter to ever write it out explicitly: leaving the
+//     section out achieves the identical result. If it exists anywhere,
+//     it would most likely be as an accidental/explicit override in some
+//     hand-edited or unusual export, not a normal exporter default.
+// Games confirmed as ABCv6 (not ABCv13 or later): Blood II, Shogo, KISS
+// Psycho Circus, TNN Outdoors Pro Hunter 2, Sanity: Aiken's Artifact.
+// Confirmed NOT ABCv6 (all files ABCv13 instead, 0 exceptions each):
+// Might and Magic IX (847 files), Legends of Might and Magic (201 files).
+// So "Lithtech 2.x" is not a reliable predictor either way -- Sanity (2.x)
+// is ABCv6, Legends (also 2.x) is ABCv13; format choice appears to be a
+// per-project/per-toolchain decision, not tied to engine version.
+//
+// Only present in LithTech 1.5-era files (the trailing "if" check in the
+// parsing code below skips this section entirely when it's absent, e.g.
+// LT1.0's CALEB.ABC). When absent, both fields default to true/true --
+// per source 1, this is exactly the fallback LT1.5 itself uses, i.e.
+// "file has no TransformInfo" and "file has TransformInfo with both flags
+// set true" are meant to behave identically.
 struct TransformInfo {
-    // This value gets set on the Model class
-    // It seems to flip the mesh inside out in some select cases
+    // AKA FlipMat (source 1's naming). Documented effect unclear/unverified
+    // by any of the three sources beyond the original vague description.
     int FlipMat;
-    // This value (if not 0) gets applied to every keyframe
+    // AKA FixAnimKeyframes (source 1's naming, matches the original 2008
+    // spec more closely than "FlipAnimKeyframes"). When true: conjugate/
+    // invert each keyframe's rotation quaternion before using it to build
+    // a node's (world or local) transform -- this is the flag that matters
+    // for getting skeletal poses to come out correctly.
     int FlipAnimKeyframes;
 };
 

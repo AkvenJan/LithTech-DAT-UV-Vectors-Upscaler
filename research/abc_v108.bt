@@ -1,21 +1,11 @@
-//------------------------------------------------
-//--- 010 Editor v10.0.1 Binary Template
-//
-//      File: 
-//   Authors: 
-//   Version: 
-//   Purpose: 
-//  Category: 
-// File Mask: 
-//  ID Bytes: 
-//   History: 
-//------------------------------------------------
+// based on pc_abc.bt
+
 typedef unsigned char uint8;
 
 struct Section {
     short stringLength;
     char Type[stringLength] <optimize=false>;
-    uint32 NextSection;
+    int32 NextSection;
 };
 
 struct LTString {
@@ -64,6 +54,9 @@ struct Header {
     uint32 WeightSetCount;
     uint32 StringCount;
     uint32 StringLengthTotal;
+    uint32 unk;
+    uint32 HitGroupCount;
+    uint32 unk;
     LTString CommandString;
     float InternalRadius;
     uint32 LODDistanceCount;
@@ -91,8 +84,9 @@ struct Weight {
 };
 
 struct Vertex {
-    uint16 WeightCount;
-    uint16 SubLODVertexIndex;
+    uint8 WeightCount;
+    uint8 SubLODVertexIndex;
+    short unk;
     Weight Weights[WeightCount] <optimize=false>;
     LTVector Location;
     LTVector Normal;
@@ -107,9 +101,12 @@ struct LOD {
 
 struct Piece (uint32 LODCount) {
     uint16 MaterialIndex;
+    short unk;
+    int unk;
     float SpecularPower;
     float SpecularScale;
-    //float LODWeight;
+    float LODWeight;
+
     uint16 Unknown;
     LTString Name;
     LOD LODs[LODCount] <optimize=false>;
@@ -127,10 +124,12 @@ struct PieceHeader (uint32 LODCount) {
 
 
 
-struct Node {
+struct Node (uint32 NodeCount) {
     LTString Name;
     uint16 Index;
     uint8 Flags;
+    int16 unk_;
+    int16 unk_;
     LTMatrix BindMatrix;
     uint32 ChildCount;
 };
@@ -152,7 +151,7 @@ struct WeightHeader {
 
 //
 // Child Models
-// 
+//
 
 
 struct ChildModel (uint32 NodeCount) {
@@ -179,8 +178,15 @@ struct KeyFrame {
     LTString Command;
 };
 
+struct AnimTransform {
+    LTVector Location;
+    LTRotation Rotation;
+    int a, b;
+};
+
 struct KeyFrameTransform (uint32 KeyFrameCount) {
-    Transform Transforms[KeyFrameCount];
+    int time;
+    AnimTransform Transforms[KeyFrameCount];
 };
 
 struct Animation (int NodeCount) {
@@ -221,7 +227,25 @@ struct AnimBinding {
 
 struct AnimBindingHeader {
     uint32 BindingCount;
-    AnimBinding AnimBindings[BindingCount];
+    AnimBinding AnimBindings[BindingCount] <optimize=false>;
+};
+
+//
+// HitGroups Data
+//
+
+struct HitGroup {
+    uint32 unk;
+    short a[6*unk];
+    float unk_[4];
+    short b[4];
+};
+
+struct HitGroupsHeader {
+    uint32 HitGroupsCount;
+
+    HitGroup hit_groups[HitGroupsCount] <optimize=false>;
+    int unk;
 };
 
 //
@@ -235,8 +259,8 @@ Section pieceSection;
 PieceHeader piece(hdr.LODCount);
 
 Section nodeSection;
-Node nodes[hdr.NodeCount]  <optimize=false>;
 WeightHeader weightsets;
+Node nodes(hdr.NodeCount)[hdr.NodeCount]  <optimize=false>;
 
 Section childSection;
 ChildModelHeader ChildModels(hdr.NodeCount);
@@ -250,3 +274,6 @@ SocketHeader Sockets;
 
 Section AnimBindingsSection;
 AnimBindingHeader AnimBindings;
+
+Section HitGroupsSection;
+HitGroupsHeader HitGroups;

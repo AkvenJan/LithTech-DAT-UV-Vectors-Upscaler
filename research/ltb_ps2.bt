@@ -2,41 +2,72 @@
 //--- 010 Editor v10.0 Binary Template
 //
 //      File: PS2 LTB
-//   Authors: Jake Breen
-//   Version: 
-//   Purpose: 
-//  Category: 
+//   Authors: Jake Breen (Modified - Nested Structure)
+//   Version: 6.0
+//   Purpose: Parse PS2 LTB with LODs nested inside Pieces
+//  Category: Game/PS2
 // File Mask: *.ltb
-//  ID Bytes: 
-//   History: 
 //------------------------------------------------
-// PS2 LTB
-typedef unsigned char		uint8;
-//typedef unsigned short int	uint16;
-//typedef unsigned int		uint32;
+typedef unsigned char uint8;
+typedef unsigned short uint16;
+typedef unsigned int uint32;
+
+// Constants
+local float WEIGHT_NORMALIZE_FACTOR = 4096.0;
+local int NODE_INDEX_DIVISOR = 4;
+
+// File tracking
+local string filename = GetFileName();
+local int currentPieceNumber = 0;
+local uint32 nodeStartOffset = 0;
+local uint32 currentOffset = 0;
+
+// Declare all loop variables at file level to avoid redeclaration
+local int lod_idx;
+local int hasSkeletalData;
+local uint32 skelWeightMapCount;
+local int checkForMore;
+local uint32 peekSize;
+local short uc;
+local uchar ucmd;
+local int meshCount;
+local uint32 meshCheck;
+local int md;
+local float vpad;
+local float vpad2;
+local uint32 v1, v2, v3, v4;
+local uint32 peekSize2;
+local short uc2;
+local uchar ucmd2;
+local uint32 wmBytes;
+local int vstart;
+local uint32 maxV;
+local uint32 safeV;
+local uint32 ev;
+local uint32 maxN;
+local uint32 safeN;
+local uint32 nm;
+local uint32 maxW;
+local uint32 safeW;
+local uint32 vw;
+local uint32 wm;
 
 struct Vector4 {
-    float x,y,z,w;
+    float x, y, z, w;
 };
 
 struct Vector3 {
-    float x,y,z;
+    float x, y, z;
 };
+
 struct TexCoord {
-    float u,v;
+    float u, v;
 };
 
 struct Quat {
-    float x,y,z,w;
+    float x, y, z, w;
 };
 
-// I'm bad at names, but this must mean something for the PS2.
-// VIFCodes: https://gtamods.com/wiki/PS2_Native_Geometry
-//
-// 0x11 = Flush - wait for end of microprogram and GIF transfer
-// 0x15 = MSCALF - call micro program
-// 0x6C = Unpack? - unpack the following data and write to VU memory
-//
 struct CommandSignal {
     short constant1;
     uchar variable;
@@ -50,21 +81,22 @@ struct Section {
 
 struct Header {
     uint32 FileType;
-    uint32 Version;
-    uint32 unkPadding[3];
-    uint32 OffsetOffset; // Offset Section Offset...
-    uint32 PieceOffset; // Maybe?
+    uint16 Version;
+    uint16 Reserved1;
+    uint32 Reserved2;
+    uint32 Reserved3; 
+    uint32 Reserved4;
+    uint32 OffsetOffset;
+    uint32 PieceOffset;
     uint32 NodeOffset; 
-    uint32 SubModelOffset;
+    uint32 ChildModelOffset;
     uint32 AnimationOffset;
     uint32 SocketOffset;
     uint32 FileSize;
-    uint32 padding;//[11];
-    
+    uint32 padding;
 };
 
 struct ModelInfo {
-    //uint32 Version;
     uint32 KeyframeCount;
     uint32 AnimationCount;
     uint32 NodeCount;
@@ -73,7 +105,7 @@ struct ModelInfo {
     uint32 TriangleCount;
     uint32 VertexCount;
     uint32 WeightCount;
-    uint32 LODCount; // This should be 1, but I have seen a prop with 2!!! D: 
+    uint32 LODCount; 
     uint32 SocketCount;
     uint32 WeightSetCount;
     uint32 StringCount;
@@ -81,21 +113,26 @@ struct ModelInfo {
     uint32 unknown;
     short CommandStringLength;
     char CommandString[CommandStringLength];
-
     float InternalRadius;
 };
 
-struct FaceVertex {
-    TexCoord UVCoord;
-    uint16 VertexIndex;
+struct ModelInfoExtended {
+    uint32 HashValue;
+    uint32 unk1;
+    uint32 unk2;
 };
 
-struct Face {
-    FaceVertex vertex[3];
+struct PieceInfo {
+    uint32 PieceCount;
 };
 
-struct MeshData
-{
+enum <int> eMeshType {
+    Rigid = 4,
+    Skeletal = 5,
+    VertexAnimated = 6,
+};
+
+struct MeshData {
     Vector3 VertexData;
     float VertexPadding;
     Vector3 NormalData;
@@ -105,178 +142,156 @@ struct MeshData
     uint32 Unknown;
 };
 
-struct MeshSet
-{
+struct MeshSet {
     uchar DataCount;
-    uchar UnknownFlag; // If 128, then it's the last Set!
+    uchar UnknownFlag;
     short Padding;
-    uint32 Unknown1;
+    uint32 RenderPatchStart;
     uint32 WindingOrder;
     uint32 Unknown3;
-    
 };
 
-// LOD Zone!
-
-// After Piece and LODSkeletal, this is filled just before LODGlue!
-struct LODStart {
+struct GeometryBatchHeader {
     uint32 VertexCount;
     uint32 WeightedNodesCount;
-    // Moved these to LODGlue
-    //uint32 Unknown2;
-    //uint32 Unknown[6];
 };
 
-// If there's any remaining data this will be filled just before LOD!
-struct LODGlue {
-    CommandSignal UnknownSignal; // Maybe?
+struct BatchConnector {
+    CommandSignal UnknownSignal;
     uint32 Unknown2;
-    CommandSignal FlushSignal; // Not useful for us, but good to know. Empty if there's no need to flush
+    CommandSignal FlushSignal;
     uint32 Unknown[4];
 };
 
-struct LOD {
+struct PS2VIFUnpack {
     CommandSignal UnpackSignal;
     uint32 MeshSetCount;
     uint32 MeshDataCount;
     uint32 Zero[2];
 };
 
-struct LODSkeletal {
+struct SkeletalMeshData {
     uint32 SkelUnk;
-    uint32 UnknownSectorSize; // This number may need to be rounded or aligned
-    //uint32 SkelUnknown[2];
-};
-// End LOD Zone!
-
-struct ModelInfoExtended {
-    uint32 HashValue; // Use rezCalcHash (from ps2rezdecoder) function with this value.
-    uint32 unk1;
-    uint32 unk2;
-};
-
-struct PieceInfo {
-    uint32 PieceCount;
-};
-
-struct Piece {
-    uint32 NodeReference;//Padding1;
-    float SpecularPower;
-    float SpecularScale;
-    float LODWeight;
-    float unkFloatyPadding[9];
-    uint32 TextureIndex; // Maybe?
-    uint32 Unknown[2];
-    int Four;
-    int MeshType; // Basically confirmed
-};
-
-struct Node {
-    uint16 NameLength;
-    char   Name[NameLength];
-    //uint16 Index;
-    //ubyte flag;    
-//uint16 UnknownPadding;
-    Vector4 Matrix[4];
-    uint32 ParentPiece;
-    //ubyte unkB1;
-    //ubyte unkB2;
-    //ushort unk2;
-    uint32 ChildCount;
-    short Index; // 
-    short Unk; // Maybe flag?
-};
-
-struct NodeOther {
-    uint32 WeightSetCount;
-
-};
-
-struct NodeWeight {
-
-};
-
-// Currently only Anim-Weightset?
-struct WeightSet {
-    uint32 ID;
-    uint32 NodeCount;
-    float Weights[NodeCount];
-};
-
-// Unknown data at the end of a mesh set..only sometimes though.
-struct MeshSetExtended
-{
-    float Unknown1;
-    float Unknown2;
-    float Unknown3;
-    float Unknown4;
+    uint32 WeightMapCount;
 };
 
 struct EndSignal {
     uint32 Padding[3];
     CommandSignal signal;
 };
-//440
-
 
 struct ExtraVertNorm {
-    Vector3 VertexData;
-    float VertexPadding;
-    Vector3 NormalData;
-    float NormalPadding;
+    float x, y, z;
+    float vertexPadding;
+    float nx, ny, nz;
+    float normalPadding;
 };
 
-struct ExtraVertNormWrapper (uint32 count) {
-    ExtraVertNorm list[count] <optimize=false>;
+struct ExtraVertNormData(uint32 count) {
+    ExtraVertNorm entries[count] <optimize=false>;
 };
 
-
-struct RandomOne {
-    uint32 One;
+struct NodeMap {
+    uint32 node;
 };
 
-struct ExtraFaceData {
-    uint32 Unk;
-    //short sUnk;
+struct NodeMapList(uint32 count) {
+    NodeMap entries[count] <optimize=false>;
 };
 
-struct TheUnknown {
-    short unk[2];
-    // 525 = Floats
-    //float whatevesfloaty[228];
-    //uint32 one;
+struct VertexWeight {
+    short firstWeight;
+    short secondWeight;
+    short thirdWeight;
+    short forthWeight;
+    char firstNode;
+    char secondNode;
+    char thirdNode;
+    char forthNode;
 };
 
-struct HeroEights {
-    uint32 Ignore;
-    Vector3 Heroes;
+struct VertexWeightData(uint32 count) {
+    VertexWeight weights[count] <optimize=false>;
+};
+
+struct WeightMapEntry {
+    short count;
+    if (count > 0) {
+        short values[count] <optimize=false>;
+    }
+};
+
+struct WeightMap {
+    local uint32 startPos = FTell();
+    local uint32 totalBytesToRead = skelWeightMapCount * 2;
+    local uint32 paddedBytes = totalBytesToRead;
+    
+    // Calculate 16-byte aligned size
+    if (totalBytesToRead % 16 != 0) {
+        paddedBytes += (16 - (totalBytesToRead % 16));
+    }
+    
+    if (FTell() + paddedBytes < nodeStartOffset) {
+        local uint32 bytesRead = 0;
+        
+        // Read WeightMapEntries until we've read totalBytesToRead bytes
+        while (bytesRead < totalBytesToRead && FTell() + 2 < nodeStartOffset) {
+            WeightMapEntry entry;
+            
+            // Each entry is: 2 bytes (count) + count * 2 bytes (values)
+            bytesRead += 2 + (entry.count * 2);
+            
+            // Safety check to avoid infinite loop
+            if (entry.count > 1000 || entry.count < 0) {
+                Printf("    Warning: Invalid WeightMapEntry count %d, stopping\n", entry.count);
+                break;
+            }
+        }
+        
+        // Skip any remaining padding to reach 16-byte alignment
+        if (bytesRead < paddedBytes && FTell() + (paddedBytes - bytesRead) < nodeStartOffset) {
+            FSkip(paddedBytes - bytesRead);
+        }
+    }
+};
+
+struct Node {
+    uint16 NameLength;
+    char   Name[NameLength];
+    Vector4 Matrix[4];
+    uint32 hashedNodeName;
+    uint32 ChildCount;
+    short Index;
+    short Unk;
+};
+
+struct NodeOther {
+    uint32 WeightSetCount;
+};
+
+struct WeightSet {
+    uint32 ID;
+    uint32 NodeCount;
+    float Weights[NodeCount];
 };
 
 struct Socket {
-/*
-        socket = Socket()
-        socket.node_index = unpack('I', f)[0]
-        socket.name = self._read_string(f)
-        socket.rotation = self._read_quaternion(f)
-        socket.location = self._read_vector(f)
-*/
     uint32 unk1;
     Quat rotation;
     Vector3 location;
     uint32 padding;
     uint32 nodeIndex;
-    uint32 hashedString;
+    uint32 hashedSocketName;
     uint32 unk3;
 };
 
-
+struct ChildModelHeader {
+    uint32 Count;
+};
 
 struct ChildModel {
     short stringLength;
     char Name[stringLength];
-};
-struct ChildModelHeader {
-    uint32 Count;
 };
 
 struct AnimationHeader {
@@ -286,372 +301,397 @@ struct AnimationHeader {
 struct KeyFrame {
     uint32 Time;
     short StringCount;
-    char String[StringCount];
+    if (StringCount > 0) {
+        if (FTell() + StringCount <= FileSize()) {
+            char String[StringCount];
+        } else {
+            Printf("    Warning: Would read past EOF at 0x%X, stopping\n", FTell());
+            return;
+        }
+    }
 };
-
-struct ThreeByte {
-    short x;
-    char xPlus;
-    short y;
-    char yPlus;
-    short z;
-    char zPlus;
-};
-
-
 
 struct CompressedFrame {
-    // Scale by 0x1000 if flag is 0
-    // Scale by 0x10 if flag is 1
     short Location[3]; 
     short LocationScaleFlag;
-    // Scale by 0x4000
     short Rotation[4]; 
 };
-
-struct CVector3 {
-    short x,y,z;
-};
-
-struct CQuat {
-    short x,y,z,w;
-};
-
 
 struct NodeKeyframe (uint32 Count)
 {
     uint32 StartMarker;
-    
-    //int16 unk[34];
-    // This should be per node...
-    CompressedFrame Frames[KeyFrameCount];//[nodeCount];
+    if (Count > 0) {
+        CompressedFrame Frames[Count];
+    }
 };
 
-// Around 543 long
 struct Animation (uint32 nodeCount) {
     Vector3 Dims;
     Vector3 Translation;
-    uint32 HashedString;
+    uint32 hashedAnimationName;
     uint32 InterpolationTime;
     uint32 KeyFrameCount;
-    KeyFrame KeyFrames[KeyFrameCount] <optimize=false>;
-    //uint32 Unk2;
     
-    // Maybe they're just compressed?
-    //CVector3 Locations[KeyFrameCount];
-    //CQuat Rotations[KeyFrameCount];
-
-
-    //short test;
-    NodeKeyframe Nodes(KeyFrameCount)[nodeCount] <optimize=false>;
-};//5052
-
-struct WeightHeader {
-    uint32 Count;
-};
-
-struct VertexWeights {
-    // Weights add up to 4096
-    short firstWeight;
-    short secondWeight;
-    short thirdWeight;
-    short forthWeight;
-    // -1 = Not used
-    char firstNode;
-    char secondNode;
-    char thirdNode;
-    char forthNode;
-};
-
-struct VertexWeightsWrapper (uint32 count) {
-    VertexWeights weights[count] <optimize=false>;
-};
-
-struct UnknownSector {
-    short unknownValues[2];
-};
-
-struct UnknownSectorWrapper (uint32 count) {
-    UnknownSector unk[count] <optimize=false>;
-};
-
-struct UnknownSectorAlt {
-    short Count;
-    short Values[Count];
-};
-
-// trhis is a test I'm testing without mouse control enabled
-//Section section;
-Header hdr;
-ModelInfo info;
-
-ModelInfoExtended infoEx;
-
-FSeek(hdr.PieceOffset);
-PieceInfo pieceInfo;
-
-local int i = 0;
-local int j = 0;
-local int count = 0;
-local int meshSetIndex = 0;
-local uint32 meshSetCheck = 0;
-
-local int setStart = 0;
-local int setEnd = 0;
-local int setSize = 0;
-
-Printf("Size Of LODStart   %d \n", sizeof(LODStart));
-Printf("Size of LODGlue    %d \n", sizeof(LODGlue));
-Printf("Size Of LOD        %d \n", sizeof(LOD));
-
-local int peekAmount = 0;
-local int checkForMoreData = 0;
-
-// When checking for more data, we fill these up
-// and then check the constant and VIF command.
-local short UnpackConstant = 0;
-local uchar UnpackVariable = 0;
-local uchar UnpackVIFCommand = 0;
-
-// End Signal Check
-local uint32 EndSignalZero[3] = { 0, 0, 0 };
-local uint32 EndSignalData = 0;
-
-local int breakFromPieces = 0;
-local float heroEight1 = 0.0f;
-local float heroEight2 = 0.0f;
-local float heroEight3 = 0.0f;
-
-local float testFloat = 0.0f;
-local int test = 0;
-
-local int totalStuff = 0;
-
-local int testZero1 = 0;
-local int testZero2 = 0;
-local float testAfter = 0.0f;
-
-local int pad = 0;
-
-// Commented out so I can work on non-geom stuff
-
-// Okay, let's loop through the pieces
-//for(i = 0; i < pieceInfo.PieceCount; i++)
-if (false)
-{
-    Printf("----------\nNew Piece\n");
-
-    // Reset some vars
-    checkForMoreData = 0;
-    test= 0;
-
-    //FSeek( FTell() - 4 );
-
-    if (breakFromPieces)
-    {
-        break;
+    if (KeyFrameCount > 0) {
+        KeyFrame KeyFrames[KeyFrameCount] <optimize=false>;
+        NodeKeyframe Nodes(KeyFrameCount)[nodeCount] <optimize=false>;
     }
+};
 
-    //
+// Helper functions
+int reachedNodeSection() {
+    currentOffset = FTell();
+    return (currentOffset >= nodeStartOffset);
+}
 
-    Piece piece;
-
-    if (piece.MeshType == 5)
-    {
-        LODSkeletal lodSkeletal;
-    }
-
-    LODStart lodStart;
-
-    // Per LOD?
-    while (true)
-    {
-        // If they reached about 13kb of data
-        // then check ahead to see if they have an unpack VIF command
-        // that *usually* signifies there's more data.
-        if (checkForMoreData)
-        {
-            peekAmount = sizeof(LODGlue);
-            UnpackConstant = ReadShort(FTell() + peekAmount);
-            UnpackVariable = ReadUByte(FTell() + peekAmount + 2);
-            UnpackVIFCommand = ReadUByte(FTell() + peekAmount + 3);
-
-            if (UnpackConstant != 80 || UnpackVIFCommand != 108)
-            {
-                break;
-            }
-
-            checkForMoreData = 0;
-        }
-
-        // Clear some local variables
-        count = 0;
-
-        LODGlue lodGlue;
-        LOD lod <optimize=false>;
+int findVertexDataStart(uint32 startPos) {
+    local uint32 searchPos = startPos;
+    local uint32 value1, value2, value3, value4;
+    local int searchLimit = Min(nodeStartOffset - startPos, 1024);
+    local int searchCount = 0;
+    
+    while (searchCount < searchLimit && searchPos + 16 < nodeStartOffset) {
+        value1 = ReadUInt(searchPos);
+        value2 = ReadUInt(searchPos + 4);
+        value3 = ReadUInt(searchPos + 8);
+        value4 = ReadUInt(searchPos + 12);
         
-        setStart = FTell();
-        // Until DataCount is exhausted
-        while(true)
-        {
+        if (value1 == 0 && value2 == 0 && value3 == 0 && value4 == 0x15000000) {
+            return searchPos + 16;
+        }
+        
+        searchPos += 4;
+        searchCount += 4;
+    }
+    
+    return -1;
+}
+
+// =====================================================
+// PIECE STRUCTURE WITH NESTED LOD DATA
+// =====================================================
+
+struct PieceLOD {
+    int MeshType;
+};
+
+// Main Piece structure with all LOD data nested inside
+struct Piece (uint32 LODCount) {
+    uint32 hashedPieceName;
+    float SpecularPower;
+    float SpecularScale;
+    float LODWeight;
+    float unkFloatyPadding[9];
+    uint32 TextureIndex;
+    uint32 Unknown[2];
+    int Four;
+    
+/*    Printf("Piece %d: Hash=0x%08X, TextureIndex=%d, SpecPower=%.3f, SpecScale=%.3f, LODWeight=%.3f, Pad=[%.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f]\n", 
+           currentPieceNumber, hashedPieceName, TextureIndex,
+           SpecularPower, SpecularScale, LODWeight,
+           unkFloatyPadding[0], unkFloatyPadding[1], unkFloatyPadding[2],
+           unkFloatyPadding[3], unkFloatyPadding[4], unkFloatyPadding[5],
+           unkFloatyPadding[6], unkFloatyPadding[7], unkFloatyPadding[8]); */
+    currentPieceNumber++;
+    
+    // Process all LODs for this piece
+    for(lod_idx = 0; lod_idx < LODCount && !reachedNodeSection(); lod_idx++) {
+        
+        if (FTell() + 4 >= nodeStartOffset) {
+            Printf("  Reached node section before LOD %d\n", lod_idx);
+            break;
+        }
+        
+        // Read MeshType
+        PieceLOD pieceLOD;
+        
+        if (pieceLOD.MeshType != 4 && pieceLOD.MeshType != 5 && pieceLOD.MeshType != 6) {
+            Printf("  Invalid MeshType %d at LOD %d, stopping\n", pieceLOD.MeshType, lod_idx);
+            FSeek(FTell() - 4);
+            break;
+        }
+        
+        Printf("  LOD %d: MeshType=%d\n", lod_idx, pieceLOD.MeshType);
+        
+        // Skeletal mesh data
+        hasSkeletalData = 0;
+        skelWeightMapCount = 0;
+        
+        if (pieceLOD.MeshType == 5) {
+            SkeletalMeshData skeletalMeshData;
+            hasSkeletalData = 1;
+            skelWeightMapCount = skeletalMeshData.WeightMapCount;
+        }
+        
+        GeometryBatchHeader geometryBatchHeader;
+        
+        if (geometryBatchHeader.VertexCount > 50000 || geometryBatchHeader.WeightedNodesCount > 1000) {
+            Printf("  Suspicious geometry, stopping\n");
+            FSeek(FTell() - 8);
+            break;
+        }
+        
+        Printf("    Verts=%d, Nodes=%d\n", geometryBatchHeader.VertexCount, geometryBatchHeader.WeightedNodesCount);
+        
+        // Batch processing
+        checkForMore = 0;
+        while (!reachedNodeSection()) {
+            if (checkForMore) {
+                peekSize = 28; // sizeof(BatchConnector) = 28 bytes!
+                if (FTell() + peekSize >= nodeStartOffset) break;
+                
+                uc = ReadShort(FTell() + peekSize);
+                ucmd = ReadUByte(FTell() + peekSize + 3);
+                if (uc != 80 || ucmd != 108) break;
+                checkForMore = 0;
+            }
             
-            // Check to see if we have our good header
-            //MeshSetCheck dataCheck;
-            meshSetCheck = ReadUInt(FTell() + 4);
-    
-            if (meshSetCheck != 808337408)
-            {
-                FSkip(4*4);
-            }
-
-            test = 0;
-            MeshSet Data <optimize=false>;
-            for (j = 0; j < Data.DataCount; j++)
-            {
-                testFloat = ReadFloat(FTell() + (4*3));
-                if (testFloat != 1.0f)
-                {
-                    FSeek(FTell() + (4*4));
+            BatchConnector batchConnector;
+            PS2VIFUnpack ps2VIFUnpack;
+            
+            meshCount = 0;
+            while (!reachedNodeSection() && meshCount < ps2VIFUnpack.MeshDataCount) {
+                if (FTell() + 16 >= nodeStartOffset) break;
+                
+                meshCheck = ReadUInt(FTell() + 4);
+                if (meshCheck != 808337408) {
+                    FSkip(16);
                 }
-                totalStuff += 1;
-
-                MeshData meshData;
-                //FSeek(FTell() + sizeof(MeshData));
-            }            
-
-            //MeshSet Data <optimize=false>;
-            count += Data.DataCount;
-    
-            if (count >= lod.MeshDataCount)
-            {
-                break;
-            }
-    
-            if (Data.UnknownFlag == 128)
-            {
-                break;
-            }
-    
-            meshSetIndex++;
-            test += Data.DataCount;
-        }
-        
-        // Check ahead for the end signal, sometimes there's an extra 4*4 row of floats.
-        EndSignalZero[0] = ReadUInt(FTell());
-        EndSignalZero[1] = ReadUInt(FTell() + 4);
-        EndSignalZero[2] = ReadUInt(FTell() + 8);
-        EndSignalData = ReadUInt(FTell() + 12);
-
-        if (EndSignalZero[0] != 0 || EndSignalZero[1] != 0 || EndSignalZero[2] != 0 || EndSignalData != 352321536)
-        {
-            MeshSetExtended dataExtended;
-        }
-
-        // 0x15 = call micro program
-        // I assume this let's the ps2 do its uploading
-        EndSignal endSignal;
-
-        
-        setEnd = FTell();
-        
-        // Calculate batch size
-        setSize = setEnd - setStart;
-
-        //Printf("size (%d) = size_end (%d) - size_start (%d)\n", setSize, setEnd, setStart);
-        //Printf("Set Size is %d\n", setSize);
-        
-        // Monolith chose around 13kb as the batch size limit
-        // (The max possible size is 16kb!)
-        // So if we're up there, might be worth checking for more data!
-        if (setSize > 13000)
-        {
-            checkForMoreData = 1;
-        } 
-        else // If we're not at that cap, then we can safely assume there's no more batched data here.
-        {
-           
-            if (piece.MeshType == 5) 
-            {
-                testZero1 = FTell();
-                while (true)
-                {
-                    UnknownSectorAlt unkSector;
-
-                    // While this works kinda, you need to account for some skipping
-                    testZero2 = FTell();
-
-                    if( ((testZero2 - testZero1) / 2) >= lodSkeletal.UnknownSectorSize)
-                    {   
-                        while(true) 
-                        {
-
-                            // Look for the 1.0 vertex padding
-                            testAfter = ReadFloat(FTell() + (4*3));
-                            if (testAfter == 1.0f)
-                            {
-                                Printf("Found 1.0f 3 ints away at %d, 1.0f position: %d\n", FTell(), FTell() + (4*3));
-                                break;
-                            }
-                            // Skip 2 bytes, because there may be a short of line padding...
-                            FSkip(2);
+                
+                MeshSet meshSet;
+                
+                if (meshSet.DataCount > 1000) break;
+                
+                for (md = 0; md < meshSet.DataCount && !reachedNodeSection(); md++) {
+                    if (FTell() + 16 >= nodeStartOffset) break;
+                    
+                    vpad = ReadFloat(FTell() + 12);
+                    if (vpad != 1.0f) {
+                        FSeek(FTell() + 16);
+                    }
+                    
+                    MeshData meshData;
+                }
+                
+                meshCount += meshSet.DataCount;
+                
+                if (meshCount >= ps2VIFUnpack.MeshDataCount) break;
+                
+                if (meshSet.UnknownFlag == 128) {
+                    while (meshCount < ps2VIFUnpack.MeshDataCount && !reachedNodeSection()) {
+                        if (FTell() + 16 >= nodeStartOffset) break;
+                        
+                        vpad2 = ReadFloat(FTell() + 12);
+                        if (vpad2 != 1.0f) {
+                            FSeek(FTell() + 16);
                         }
-                        // Super hack: Use the remainder value to break through twice.
-                        if (testAfter == 1.0f)
-                        {
-                            break;
+                        
+                        MeshData meshData;
+                        meshCount++;
+                    }
+                    break;
+                }
+            }
+            
+            // endVIF
+            if (FTell() + 16 <= nodeStartOffset) {
+                v1 = ReadUInt(FTell());
+                v2 = ReadUInt(FTell() + 4);
+                v3 = ReadUInt(FTell() + 8);
+                v4 = ReadUInt(FTell() + 12);
+                
+                if (v1 == 0 && v2 == 0 && v3 == 0 && (v4 == 0x15000000 || v4 == 0x11000000)) {
+                    EndSignal endSignal;
+                } else {
+                    FSkip(16);
+                }
+            } else {
+                break;
+            }
+            
+            // Check for more batches
+            if (!reachedNodeSection()) {
+                peekSize2 = 28; // sizeof(BatchConnector) = 28 bytes!
+                if (FTell() + peekSize2 < nodeStartOffset) {
+                    uc2 = ReadShort(FTell() + peekSize2);
+                    ucmd2 = ReadUByte(FTell() + peekSize2 + 3);
+                    checkForMore = (uc2 == 80 && ucmd2 == 108);
+                } else {
+                    checkForMore = 0;
+                }
+            } else {
+                checkForMore = 0;
+            }
+            
+            // Skeletal mesh trailing data
+            if (!checkForMore && hasSkeletalData && !reachedNodeSection()) {
+                // 1. Process WeightMap
+                if (skelWeightMapCount > 0) {
+                    WeightMap weightMap;
+                }
+                
+                if (reachedNodeSection()) break;
+                
+                // 2. ExtraVertNormData - calculate safe count first
+                maxV = (nodeStartOffset - FTell()) / 32;
+                safeV = Min(geometryBatchHeader.VertexCount, maxV);
+                
+                if (safeV > 0 && safeV < 50000) {
+                    ExtraVertNormData extraVertNormData(safeV);
+                    
+                    if (!reachedNodeSection()) {
+                        // 3. NodeMapList
+                        maxN = (nodeStartOffset - FTell()) / 4;
+                        safeN = Min(geometryBatchHeader.WeightedNodesCount, maxN);
+                        
+                        if (safeN > 0 && safeN < 1000) {
+                            NodeMapList nodeMapList(safeN);
+                            
+                            if (!reachedNodeSection()) {
+                                // 4. VertexWeightData
+                                maxW = (nodeStartOffset - FTell()) / 12;
+                                safeW = Min(geometryBatchHeader.VertexCount, maxW);
+                                
+                                if (safeW > 0 && safeW < 50000) {
+                                    VertexWeightData vertexWeightData(safeW);
+                                }
+                            }
                         }
                     }
                 }
-                testZero2 = FTell();
-                Printf("Finish unknown sector skip at %d\n", testZero2);
-                Printf("Total size of unknown sector: %d\n", testZero2 - testZero1);
-                //UnknownSectorWrapper unkSector(lodSkeletal.UnknownSectorSize);
-
-                ExtraVertNormWrapper extraMeshData(lodStart.VertexCount) <optimize=false>;
-
-                // Skip past the indexed bone list
-                FSeek(FTell() + (4*lodStart.WeightedNodesCount));
-
-                VertexWeightsWrapper weights(lodStart.VertexCount) <optimize=false>;
-
+                
+                break;
             }
-
             
-            break;
+            if (!checkForMore) break;
         }
+    }
+};
 
-        
+// =====================================================
+// MAIN PARSING
+// =====================================================
+
+Header hdr;
+ModelInfo info;
+
+if (hdr.Version == 16) {
+    ModelInfoExtended infoExtended;
+}
+
+// Jump to piece section as indicated by header
+FSeek(hdr.PieceOffset);
+
+PieceInfo pieceInfo;
+
+local uint32 pieceHashes[pieceInfo.PieceCount];
+local int i, j;
+
+nodeStartOffset = hdr.NodeOffset;
+Printf("Node section starts at offset: 0x%X\n", nodeStartOffset);
+Printf("--------------------------------\n");
+Printf("PIECE INFORMATION:\n");
+Printf("--------------------------------\n");
+
+// Process pieces with nested LODs
+for(i = 0; i < pieceInfo.PieceCount && !reachedNodeSection(); i++)
+{
+    Piece piece(info.LODCount);
+    pieceHashes[i] = piece.hashedPieceName;
+    
+    if (reachedNodeSection()) {
+        Printf("Reached node section\n");
+        break;
     }
 }
 
-// 279 = tail
-// 530 = same part
-//return;
-// tnt FSeek(4420);
-FSeek(hdr.NodeOffset - (sizeof(VertexWeights) * info.VertexCount) );
-//VertexWeights weights[info.VertexCount];
+// Ensure at node section
+if (FTell() != nodeStartOffset) {
+    Printf("Adjusting to node section: 0x%X\n", nodeStartOffset);
+    FSeek(nodeStartOffset);
+}
 
-FSeek(hdr.NodeOffset);
-Node node[info.NodeCount] <optimize=false>;
+Printf("--------------------------------\n");
+Printf("NODE INFORMATION:\n");
+Printf("--------------------------------\n");
 
-// Actually Anim WeightSet, see dog_action.lta / ltb
+Node nodes[info.NodeCount] <optimize=false>;
+
+// Print node information
+for(i = 0; i < info.NodeCount; i++) {
+    Printf("Node %d: %s\n", i, nodes[i].Name);
+    Printf("  Hashed Node Name: 0x%08X\n", nodes[i].hashedNodeName);
+    Printf("  Node Index: %d\n", nodes[i].Index);
+    Printf("  Node ChildCount: %d\n", nodes[i].ChildCount);
+    Printf("\n");
+}
+
+Printf("--------------------------------\n");
+Printf("WEIGHT SET INFORMATION:\n");
+Printf("--------------------------------\n");
+
 NodeOther nodeOther;
-WeightSet weightSets[nodeOther.WeightSetCount];
 
-FSeek(hdr.SubModelOffset);
-ChildModelHeader childModelHdr;
-// For some reason it's off by one
-ChildModel ChildModels[info.ChildModelCount - 1] <optimize=false>;
+Printf("Weight Set Count: %d\n", nodeOther.WeightSetCount);
 
-FSeek(hdr.AnimationOffset);
-AnimationHeader animationHdr;
+if(nodeOther.WeightSetCount > 0 && nodeOther.WeightSetCount < 500) {
+    WeightSet weightSets[nodeOther.WeightSetCount] <optimize=false>;
+} else {
+    Printf("Skipping weight sets due to invalid count\n");
+}
 
-// 162 bytes per animation for poodle
+Printf("--------------------------------\n");
+Printf("CHILD MODEL INFORMATION:\n");
+Printf("--------------------------------\n");
 
-Animation animation(info.NodeCount)[info.AnimationCount] <optimize=false>;
+if (hdr.ChildModelOffset > 0) {
+    FSeek(hdr.ChildModelOffset);
+    ChildModelHeader childModelHdr;
+    
+    Printf("Child Model Count: %d\n", childModelHdr.Count);
 
+    if(info.ChildModelCount > 1 && info.ChildModelCount < 500) {
+        ChildModel ChildModels[info.ChildModelCount - 1] <optimize=false>;
+    } else {
+        Printf("No additional child models to process\n");
+    }
+} else {
+    Printf("No child model section found\n");
+}
 
+Printf("--------------------------------\n");
+Printf("ANIMATION INFORMATION:\n");
+Printf("--------------------------------\n");
 
-FSeek(hdr.SocketOffset);
-Socket sockets[info.SocketCount] <optimize=false>;
- 
+if (hdr.AnimationOffset > 0 && hdr.AnimationOffset < FileSize()) {
+    FSeek(hdr.AnimationOffset);
+    AnimationHeader animationHdr;
+    
+    Printf("Animation Count: %d\n", animationHdr.Count);
+    
+    Animation animation(info.NodeCount)[animationHdr.Count] <optimize=false>;
+} else {
+    Printf("No animation section found or invalid offset\n");
+}
+
+Printf("--------------------------------\n");
+Printf("SOCKET INFORMATION:\n");
+Printf("--------------------------------\n");
+
+if (hdr.SocketOffset > 0) {
+    FSeek(hdr.SocketOffset);
+    
+    Printf("Socket Count: %d\n", info.SocketCount);
+
+    if(info.SocketCount > 0 && info.SocketCount < 500) {
+        Socket sockets[info.SocketCount] <optimize=false>;
+    } else {
+        Printf("Skipping sockets due to invalid count\n");
+    }
+} else {
+    Printf("No socket section found\n");
+}
+
+Printf("--------------------------------\n");
+Printf("Analysis complete for %s\n", filename);
+Printf("--------------------------------\n");
